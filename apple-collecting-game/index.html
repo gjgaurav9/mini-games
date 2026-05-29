@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🍎 Apples for Mom</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    font-family: "Comic Sans MS", "Trebuchet MS", sans-serif;
+    overflow: hidden;
+    background: #87ceeb;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #game {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(#87ceeb 0%, #b3e5fc 55%, #c8efa0 55%, #a5d66f 100%);
+    overflow: hidden;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: rgba(0,0,0,0.45);
+    color: #fff;
+    padding: 24px;
+    z-index: 10;
+  }
+  .overlay h1 { font-size: clamp(32px, 7vw, 64px); text-shadow: 3px 3px 0 #c0392b; }
+  .overlay p { font-size: clamp(16px, 3vw, 24px); margin: 14px 0; max-width: 640px; }
+  .btn {
+    margin-top: 18px;
+    padding: 14px 34px;
+    font-size: clamp(18px, 4vw, 28px);
+    font-family: inherit;
+    border: none;
+    border-radius: 50px;
+    background: #e74c3c;
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #a93226;
+    transition: transform .05s;
+  }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #a93226; }
+  .hidden { display: none !important; }
+
+  #hud {
+    position: absolute;
+    top: 14px; left: 14px;
+    z-index: 5;
+    background: rgba(255,255,255,0.85);
+    padding: 10px 18px;
+    border-radius: 16px;
+    font-size: clamp(18px, 4vw, 26px);
+    color: #2c3e50;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+  }
+  #progressWrap {
+    position: absolute;
+    top: 14px; right: 14px;
+    z-index: 5;
+    width: min(38vw, 280px);
+    background: rgba(255,255,255,0.85);
+    padding: 8px 12px;
+    border-radius: 16px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+  }
+  #progressWrap .label { font-size: 13px; color: #2c3e50; margin-bottom: 4px; }
+  #progressBar { height: 12px; background: #dfe6e9; border-radius: 8px; overflow: hidden; }
+  #progressFill { height: 100%; width: 0%; background: #27ae60; border-radius: 8px; transition: width .15s; }
+
+  .hint {
+    position: absolute;
+    bottom: 16px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    color: #2c3e50;
+    background: rgba(255,255,255,0.7);
+    padding: 6px 16px;
+    border-radius: 14px;
+    font-size: clamp(13px, 3vw, 18px);
+  }
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="canvas"></canvas>
+
+  <div id="hud">🍎 <span id="score">0</span></div>
+  <div id="progressWrap">
+    <div class="label">Journey to Mom 🏡</div>
+    <div id="progressBar"><div id="progressFill"></div></div>
+  </div>
+  <div class="hint">⬅️ ➡️ move &nbsp;•&nbsp; ⬆️ / Space jump &nbsp;•&nbsp; tap screen sides on mobile</div>
+
+  <!-- Start screen -->
+  <div id="startScreen" class="overlay">
+    <h1>🍎 Apples for Mom</h1>
+    <p>Help Lily walk home and collect as many apples as she can.
+       Jump over the puddles! When she reaches Mom, she gives them all away. 💛</p>
+    <button class="btn" id="startBtn">Start the Journey</button>
+  </div>
+
+  <!-- End screen -->
+  <div id="endScreen" class="overlay hidden">
+    <h1 id="endTitle">You made it! 🏡</h1>
+    <p id="endMsg"></p>
+    <button class="btn" id="againBtn">Play Again</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let W, H, ground;
+function resize() {
+  W = canvas.width = canvas.clientWidth;
+  H = canvas.height = canvas.clientHeight;
+  ground = H * 0.82;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// ---- Game state ----
+const JOURNEY_LENGTH = 6000; // world units to reach mom
+let state, score, distance, kid, apples, puddles, clouds, keys;
+
+function reset() {
+  state = "playing";
+  score = 0;
+  distance = 0;
+  keys = { left: false, right: false };
+  kid = {
+    x: W * 0.25, worldX: 0,
+    y: ground, vy: 0,
+    w: 46, h: 70,
+    onGround: true, face: 1, walkPhase: 0
+  };
+  apples = [];
+  puddles = [];
+  clouds = [];
+
+  // Pre-place apples along the journey (floating + on ground)
+  for (let d = 400; d < JOURNEY_LENGTH - 300; d += 180 + Math.random() * 160) {
+    const high = Math.random() < 0.4;
+    apples.push({
+      worldX: d,
+      y: high ? ground - 150 - Math.random() * 90 : ground - 30,
+      collected: false,
+      bob: Math.random() * Math.PI * 2
+    });
+  }
+  // Puddles to jump over
+  for (let d = 700; d < JOURNEY_LENGTH - 400; d += 600 + Math.random() * 500) {
+    puddles.push({ worldX: d, w: 70 + Math.random() * 50 });
+  }
+  // Clouds (parallax)
+  for (let i = 0; i < 6; i++) {
+    clouds.push({ x: Math.random() * W, y: 40 + Math.random() * (H * 0.35), s: 0.3 + Math.random() * 0.4, scale: 0.7 + Math.random() });
+  }
+}
+
+// ---- Input ----
+const keymap = { ArrowLeft: "left", ArrowRight: "right" };
+addEventListener("keydown", (e) => {
+  if (keymap[e.key]) keys[keymap[e.key]] = true;
+  if ((e.key === "ArrowUp" || e.key === " ") && state === "playing") jump();
+  if ([" ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
+});
+addEventListener("keyup", (e) => { if (keymap[e.key]) keys[keymap[e.key]] = false; });
+
+// Touch controls: left third = left, right third = right, top/tap = jump
+function touchHandler(e) {
+  if (state !== "playing") return;
+  for (const t of e.touches) {
+    const x = t.clientX;
+    if (x < W / 3) { keys.left = true; keys.right = false; }
+    else if (x > (2 * W) / 3) { keys.right = true; keys.left = false; }
+    else jump();
+  }
+  e.preventDefault();
+}
+canvas.addEventListener("touchstart", touchHandler, { passive: false });
+canvas.addEventListener("touchmove", touchHandler, { passive: false });
+canvas.addEventListener("touchend", (e) => { if (e.touches.length === 0) { keys.left = keys.right = false; } });
+
+function jump() {
+  if (kid.onGround) { kid.vy = -15; kid.onGround = false; }
+}
+
+// ---- Update ----
+const SPEED = 4.2;
+const GRAVITY = 0.7;
+
+function update() {
+  if (state !== "playing") return;
+
+  // Move
+  if (keys.right) { kid.worldX += SPEED; kid.face = 1; kid.walkPhase += 0.25; }
+  if (keys.left)  { kid.worldX = Math.max(0, kid.worldX - SPEED); kid.face = -1; kid.walkPhase += 0.25; }
+
+  distance = kid.worldX;
+
+  // Jump physics
+  kid.vy += GRAVITY;
+  kid.y += kid.vy;
+  if (kid.y >= ground) { kid.y = ground; kid.vy = 0; kid.onGround = true; }
+
+  // Camera: kid stays ~25% from left
+  const camX = kid.worldX - W * 0.25;
+
+  // Collect apples
+  const kidScreenX = kid.worldX - camX;
+  for (const a of apples) {
+    if (a.collected) continue;
+    a.bob += 0.05;
+    const ax = a.worldX - camX;
+    const ay = a.y + Math.sin(a.bob) * 6;
+    const dx = ax - kidScreenX;
+    const dy = ay - (kid.y - kid.h / 2);
+    if (Math.abs(dx) < 42 && Math.abs(dy) < 55) {
+      a.collected = true;
+      score++;
+      pop(ax, ay);
+    }
+  }
+
+  // Clouds drift
+  for (const c of clouds) {
+    c.x -= c.s;
+    if (c.x < -120) { c.x = W + 60; c.y = 40 + Math.random() * (H * 0.35); }
+  }
+
+  // Reached mom?
+  if (kid.worldX >= JOURNEY_LENGTH) finish();
+}
+
+// little particle pops
+let pops = [];
+function pop(x, y) {
+  for (let i = 0; i < 8; i++) {
+    pops.push({ x, y, vx: (Math.random() - 0.5) * 6, vy: -Math.random() * 5 - 1, life: 1 });
+  }
+}
+
+// ---- Draw ----
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  const camX = kid.worldX - W * 0.25;
+
+  // Clouds
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  for (const c of clouds) cloud(c.x, c.y, c.scale);
+
+  // Ground line + grass texture
+  ctx.fillStyle = "#7cb342";
+  ctx.fillRect(0, ground, W, H - ground);
+  ctx.strokeStyle = "#689f38";
+  ctx.lineWidth = 3;
+  for (let gx = -(camX % 40); gx < W; gx += 40) {
+    ctx.beginPath();
+    ctx.moveTo(gx, ground + 6);
+    ctx.lineTo(gx + 8, ground - 8);
+    ctx.stroke();
+  }
+
+  // Path
+  ctx.fillStyle = "#caa472";
+  ctx.fillRect(0, ground, W, 14);
+
+  // Puddles
+  for (const p of puddles) {
+    const px = p.worldX - camX;
+    if (px < -200 || px > W + 200) continue;
+    ctx.fillStyle = "#4fc3f7";
+    ctx.beginPath();
+    ctx.ellipse(px, ground + 8, p.w / 2, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.beginPath();
+    ctx.ellipse(px - p.w / 6, ground + 5, p.w / 8, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Apples
+  for (const a of apples) {
+    if (a.collected) continue;
+    const ax = a.worldX - camX;
+    if (ax < -50 || ax > W + 50) continue;
+    drawApple(ax, a.y + Math.sin(a.bob) * 6);
+  }
+
+  // Mom's house at the end
+  const houseX = JOURNEY_LENGTH - camX + 40;
+  if (houseX < W + 300) drawHomeAndMom(houseX);
+
+  // Kid
+  drawKid(W * 0.25, kid.y);
+
+  // Pops
+  pops = pops.filter((p) => p.life > 0);
+  for (const p of pops) {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.3; p.life -= 0.04;
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = "#e74c3c";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // HUD
+  document.getElementById("score").textContent = score;
+  document.getElementById("progressFill").style.width =
+    Math.min(100, (distance / JOURNEY_LENGTH) * 100) + "%";
+}
+
+function cloud(x, y, s = 1) {
+  ctx.beginPath();
+  ctx.arc(x, y, 26 * s, 0, Math.PI * 2);
+  ctx.arc(x + 28 * s, y + 6 * s, 22 * s, 0, Math.PI * 2);
+  ctx.arc(x - 26 * s, y + 8 * s, 20 * s, 0, Math.PI * 2);
+  ctx.arc(x + 4 * s, y - 14 * s, 20 * s, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawApple(x, y) {
+  ctx.fillStyle = "#e74c3c";
+  ctx.beginPath();
+  ctx.arc(x - 6, y, 12, 0, Math.PI * 2);
+  ctx.arc(x + 6, y, 12, 0, Math.PI * 2);
+  ctx.fill();
+  // shine
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.beginPath();
+  ctx.arc(x - 7, y - 5, 3, 0, Math.PI * 2);
+  ctx.fill();
+  // stem + leaf
+  ctx.strokeStyle = "#7b4a2d";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(x, y - 10);
+  ctx.lineTo(x + 2, y - 20);
+  ctx.stroke();
+  ctx.fillStyle = "#2ecc71";
+  ctx.beginPath();
+  ctx.ellipse(x + 8, y - 18, 7, 4, -0.6, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawKid(cx, footY) {
+  const bob = (keys.left || keys.right) && kid.onGround ? Math.sin(kid.walkPhase) * 3 : 0;
+  const y = footY + bob;
+  ctx.save();
+  ctx.translate(cx, 0);
+  ctx.scale(kid.face, 1);
+
+  // legs (walking)
+  const swing = (keys.left || keys.right) && kid.onGround ? Math.sin(kid.walkPhase) * 8 : 0;
+  ctx.strokeStyle = "#34495e";
+  ctx.lineWidth = 7;
+  ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(-6, y - 28); ctx.lineTo(-6 + swing, y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(6, y - 28); ctx.lineTo(6 - swing, y); ctx.stroke();
+
+  // body
+  ctx.fillStyle = "#3498db";
+  roundRect(-15, y - 60, 30, 36, 10);
+  ctx.fill();
+
+  // arms
+  ctx.strokeStyle = "#f1c27d";
+  ctx.beginPath(); ctx.moveTo(-12, y - 52); ctx.lineTo(-22, y - 38 + swing / 2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(12, y - 52); ctx.lineTo(22, y - 38 - swing / 2); ctx.stroke();
+
+  // head
+  ctx.fillStyle = "#f1c27d";
+  ctx.beginPath(); ctx.arc(0, y - 74, 16, 0, Math.PI * 2); ctx.fill();
+  // hair
+  ctx.fillStyle = "#6d4c41";
+  ctx.beginPath(); ctx.arc(0, y - 80, 16, Math.PI, 0); ctx.fill();
+  ctx.fillRect(-16, y - 80, 4, 8);
+  // face
+  ctx.fillStyle = "#2c3e50";
+  ctx.beginPath(); ctx.arc(6, y - 74, 2.2, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "#c0392b";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(5, y - 70, 5, 0.1, Math.PI - 0.1); ctx.stroke();
+
+  // a little basket of apples that grows with score
+  if (score > 0) {
+    ctx.fillStyle = "#8d6e63";
+    roundRect(14, y - 34, 16, 12, 3); ctx.fill();
+    ctx.fillStyle = "#e74c3c";
+    const n = Math.min(score, 5);
+    for (let i = 0; i < n; i++) {
+      ctx.beginPath();
+      ctx.arc(18 + (i % 3) * 5, y - 36 - Math.floor(i / 3) * 4, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawHomeAndMom(x) {
+  // house
+  ctx.fillStyle = "#f5deb3";
+  ctx.fillRect(x, ground - 130, 160, 130);
+  ctx.fillStyle = "#c0392b"; // roof
+  ctx.beginPath();
+  ctx.moveTo(x - 14, ground - 130);
+  ctx.lineTo(x + 80, ground - 200);
+  ctx.lineTo(x + 174, ground - 130);
+  ctx.closePath(); ctx.fill();
+  // door
+  ctx.fillStyle = "#8d6e63";
+  ctx.fillRect(x + 110, ground - 70, 36, 70);
+  // window
+  ctx.fillStyle = "#aed6f1";
+  ctx.fillRect(x + 24, ground - 100, 40, 40);
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
+  ctx.strokeRect(x + 24, ground - 100, 40, 40);
+
+  // Mom standing by the door, waving
+  const mx = x + 80, my = ground;
+  ctx.strokeStyle = "#8e44ad"; ctx.lineWidth = 7; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(mx - 5, my - 30); ctx.lineTo(mx - 5, my); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(mx + 5, my - 30); ctx.lineTo(mx + 5, my); ctx.stroke();
+  // dress
+  ctx.fillStyle = "#8e44ad";
+  ctx.beginPath();
+  ctx.moveTo(mx - 16, my - 30);
+  ctx.lineTo(mx + 16, my - 30);
+  ctx.lineTo(mx + 10, my - 70);
+  ctx.lineTo(mx - 10, my - 70);
+  ctx.closePath(); ctx.fill();
+  // waving arm
+  const wave = Math.sin(Date.now() / 200) * 0.4;
+  ctx.strokeStyle = "#f1c27d";
+  ctx.save();
+  ctx.translate(mx + 8, my - 64);
+  ctx.rotate(-0.8 + wave);
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(20, 0); ctx.stroke();
+  ctx.restore();
+  ctx.beginPath(); ctx.moveTo(mx - 8, my - 64); ctx.lineTo(mx - 22, my - 48); ctx.stroke();
+  // head + hair
+  ctx.fillStyle = "#f1c27d";
+  ctx.beginPath(); ctx.arc(mx, my - 84, 14, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#4e342e";
+  ctx.beginPath(); ctx.arc(mx, my - 88, 15, Math.PI, 0); ctx.fill();
+  ctx.fillRect(mx - 15, my - 88, 5, 18);
+  ctx.fillRect(mx + 10, my - 88, 5, 18);
+  // smile
+  ctx.strokeStyle = "#c0392b"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(mx, my - 82, 5, 0.1, Math.PI - 0.1); ctx.stroke();
+
+  // heart
+  const hb = 1 + Math.sin(Date.now() / 300) * 0.1;
+  heart(mx, my - 115, 10 * hb);
+}
+
+function heart(x, y, s) {
+  ctx.fillStyle = "#e84393";
+  ctx.beginPath();
+  ctx.moveTo(x, y + s * 0.8);
+  ctx.bezierCurveTo(x + s, y - s * 0.4, x + s * 0.6, y - s, x, y - s * 0.3);
+  ctx.bezierCurveTo(x - s * 0.6, y - s, x - s, y - s * 0.4, x, y + s * 0.8);
+  ctx.fill();
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// ---- Loop ----
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ---- Screens ----
+const startScreen = document.getElementById("startScreen");
+const endScreen = document.getElementById("endScreen");
+
+function finish() {
+  state = "done";
+  keys.left = keys.right = false;
+  const total = apples.length;
+  document.getElementById("endTitle").textContent = "Lily gives Mom the apples! 💛";
+  let stars = "⭐⭐⭐";
+  if (score < total * 0.4) stars = "⭐";
+  else if (score < total * 0.75) stars = "⭐⭐";
+  document.getElementById("endMsg").innerHTML =
+    `She collected <b>${score}</b> of ${total} apples along the way.<br>` +
+    `"Thank you, sweetheart!" says Mom. 🤗<br><br>${stars}`;
+  endScreen.classList.remove("hidden");
+}
+
+document.getElementById("startBtn").addEventListener("click", () => {
+  startScreen.classList.add("hidden");
+  reset();
+});
+document.getElementById("againBtn").addEventListener("click", () => {
+  endScreen.classList.add("hidden");
+  reset();
+});
+
+// init in idle state so something renders behind start screen
+reset();
+state = "idle";
+loop();
+</script>
+</body>
+</html>

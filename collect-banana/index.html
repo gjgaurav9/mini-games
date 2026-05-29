@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🍌 Collect Banana</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    font-family: "Comic Sans MS", "Trebuchet MS", sans-serif;
+    overflow: hidden;
+    background: #87ceeb;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #game {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(#aee0ff 0%, #cdeffc 55%, #d7f0a8 55%, #aee07a 100%);
+    overflow: hidden;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: rgba(0,0,0,0.45);
+    color: #fff;
+    padding: 24px;
+    z-index: 10;
+  }
+  .overlay h1 { font-size: clamp(32px, 7vw, 64px); text-shadow: 3px 3px 0 #d4a017; }
+  .overlay p { font-size: clamp(16px, 3vw, 24px); margin: 14px 0; max-width: 640px; }
+  .btn {
+    margin-top: 18px;
+    padding: 14px 34px;
+    font-size: clamp(18px, 4vw, 28px);
+    font-family: inherit;
+    border: none;
+    border-radius: 50px;
+    background: #f5b301;
+    color: #5a3e00;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #b88600;
+    transition: transform .05s;
+  }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #b88600; }
+  .hidden { display: none !important; }
+
+  #hud {
+    position: absolute;
+    top: 14px; left: 14px;
+    z-index: 5;
+    background: rgba(255,255,255,0.85);
+    padding: 10px 18px;
+    border-radius: 16px;
+    font-size: clamp(18px, 4vw, 26px);
+    color: #2c3e50;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+  }
+  #progressWrap {
+    position: absolute;
+    top: 14px; right: 14px;
+    z-index: 5;
+    width: min(38vw, 280px);
+    background: rgba(255,255,255,0.85);
+    padding: 8px 12px;
+    border-radius: 16px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+  }
+  #progressWrap .label { font-size: 13px; color: #2c3e50; margin-bottom: 4px; }
+  #progressBar { height: 12px; background: #dfe6e9; border-radius: 8px; overflow: hidden; }
+  #progressFill { height: 100%; width: 0%; background: #f5b301; border-radius: 8px; transition: width .15s; }
+
+  .hint {
+    position: absolute;
+    bottom: 16px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    color: #2c3e50;
+    background: rgba(255,255,255,0.7);
+    padding: 6px 16px;
+    border-radius: 14px;
+    font-size: clamp(13px, 3vw, 18px);
+  }
+  /* floating "Shake!" prompt */
+  #shakeTip {
+    position: absolute;
+    z-index: 6;
+    transform: translate(-50%, -100%);
+    background: #f5b301;
+    color: #5a3e00;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: clamp(13px, 3vw, 18px);
+    font-weight: bold;
+    white-space: nowrap;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.25);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="canvas"></canvas>
+
+  <div id="hud">🍌 <span id="score">0</span></div>
+  <div id="progressWrap">
+    <div class="label">Walk home to Mom 🏡</div>
+    <div id="progressBar"><div id="progressFill"></div></div>
+  </div>
+  <div class="hint">⬅️ ➡️ walk &nbsp;•&nbsp; ⬆️ / Space shake the tree &nbsp;•&nbsp; on mobile: tap sides to walk, tap middle to shake</div>
+
+  <div id="shakeTip" class="hidden">Tap / Space to shake! 🌴</div>
+
+  <!-- Start screen -->
+  <div id="startScreen" class="overlay">
+    <h1>🍌 Collect Banana</h1>
+    <p>Maya goes for a walk past the banana trees. Stand under a tree and
+       <b>shake it</b> — bananas tumble down! Catch them, then bring the whole
+       bunch home to Mom. 💛</p>
+    <button class="btn" id="startBtn">Start the Walk</button>
+  </div>
+
+  <!-- End screen -->
+  <div id="endScreen" class="overlay hidden">
+    <h1 id="endTitle">You made it! 🏡</h1>
+    <p id="endMsg"></p>
+    <button class="btn" id="againBtn">Play Again</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let W, H, ground;
+function resize() {
+  W = canvas.width = canvas.clientWidth;
+  H = canvas.height = canvas.clientHeight;
+  ground = H * 0.82;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// ---- Game state ----
+const JOURNEY_LENGTH = 6000; // world units to reach mom
+let state, score, distance, kid, trees, bananas, clouds, keys, shakeNow;
+
+function reset() {
+  state = "playing";
+  score = 0;
+  distance = 0;
+  shakeNow = false;
+  keys = { left: false, right: false };
+  kid = {
+    worldX: 0,
+    y: ground, vy: 0,
+    w: 46, h: 70,
+    onGround: true, face: 1, walkPhase: 0
+  };
+  trees = [];
+  bananas = [];      // falling / landed bananas
+  clouds = [];
+
+  // Banana trees along the path. Each starts with a bunch waiting to be shaken.
+  for (let d = 500; d < JOURNEY_LENGTH - 400; d += 520 + Math.random() * 320) {
+    trees.push({
+      worldX: d,
+      bunch: 2 + Math.floor(Math.random() * 3), // bananas still on the tree
+      sway: 0,                                   // shake animation
+    });
+  }
+  // Clouds (parallax)
+  for (let i = 0; i < 6; i++) {
+    clouds.push({ x: Math.random() * W, y: 40 + Math.random() * (H * 0.35), s: 0.3 + Math.random() * 0.4, scale: 0.7 + Math.random() });
+  }
+}
+
+// ---- Input ----
+const keymap = { ArrowLeft: "left", ArrowRight: "right" };
+addEventListener("keydown", (e) => {
+  if (keymap[e.key]) keys[keymap[e.key]] = true;
+  if ((e.key === "ArrowUp" || e.key === " ") && state === "playing") shakeNow = true;
+  if ([" ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
+});
+addEventListener("keyup", (e) => { if (keymap[e.key]) keys[keymap[e.key]] = false; });
+
+// Touch controls: left third = left, right third = right, middle = shake
+function touchHandler(e) {
+  if (state !== "playing") return;
+  for (const t of e.touches) {
+    const x = t.clientX;
+    if (x < W / 3) { keys.left = true; keys.right = false; }
+    else if (x > (2 * W) / 3) { keys.right = true; keys.left = false; }
+    else shakeNow = true;
+  }
+  e.preventDefault();
+}
+canvas.addEventListener("touchstart", touchHandler, { passive: false });
+canvas.addEventListener("touchmove", touchHandler, { passive: false });
+canvas.addEventListener("touchend", (e) => { if (e.touches.length === 0) { keys.left = keys.right = false; } });
+
+// ---- Update ----
+const SPEED = 4.2;
+const GRAVITY = 0.7;
+const TREE_REACH = 70;     // how close Maya must be to shake a tree
+const CATCH_RADIUS_X = 46; // catching a banana
+
+function nearestTree() {
+  let best = null, bestDist = TREE_REACH;
+  for (const t of trees) {
+    if (t.bunch <= 0) continue;
+    const d = Math.abs(t.worldX - kid.worldX);
+    if (d < bestDist) { bestDist = d; best = t; }
+  }
+  return best;
+}
+
+function update() {
+  if (state !== "playing") return;
+
+  // Move
+  if (keys.right) { kid.worldX += SPEED; kid.face = 1; kid.walkPhase += 0.25; }
+  if (keys.left)  { kid.worldX = Math.max(0, kid.worldX - SPEED); kid.face = -1; kid.walkPhase += 0.25; }
+  distance = kid.worldX;
+
+  // Shake a nearby tree
+  const tree = nearestTree();
+  if (shakeNow && tree) {
+    tree.sway = 1;                 // trigger sway animation
+    const drop = Math.min(tree.bunch, 1 + Math.floor(Math.random() * 2));
+    for (let i = 0; i < drop; i++) {
+      bananas.push({
+        worldX: tree.worldX + (Math.random() - 0.5) * 30,
+        y: ground - 150 - Math.random() * 20,
+        vy: 1 + Math.random() * 1.5,
+        landed: false, landTimer: 0, collected: false,
+        rot: Math.random() * Math.PI, spin: (Math.random() - 0.5) * 0.2
+      });
+    }
+    tree.bunch -= drop;
+  }
+  shakeNow = false;
+
+  // Tree sway decay
+  for (const t of trees) if (t.sway > 0) t.sway = Math.max(0, t.sway - 0.04);
+
+  // Jump physics not needed; Maya stays grounded
+  kid.y = ground;
+
+  const camX = kid.worldX - W * 0.25;
+  const kidScreenX = kid.worldX - camX; // == W*0.25
+
+  // Bananas fall, land, and get collected
+  for (const b of bananas) {
+    if (b.collected) continue;
+    if (!b.landed) {
+      b.vy += GRAVITY * 0.5;
+      b.y += b.vy;
+      b.rot += b.spin;
+      if (b.y >= ground - 12) { b.y = ground - 12; b.landed = true; b.rot = 0; }
+    } else {
+      b.landTimer += 1; // sit on ground, collectible
+    }
+    // Collect when Maya overlaps (catching in air OR picking off the ground)
+    const bx = b.worldX - camX;
+    const dx = bx - kidScreenX;
+    const dy = b.y - (kid.y - kid.h / 2);
+    if (Math.abs(dx) < CATCH_RADIUS_X && Math.abs(dy) < 60) {
+      b.collected = true;
+      score++;
+      pop(bx, b.y);
+    }
+  }
+  // Keep only bananas that are uncollected and haven't sat on the ground too long
+  bananas = bananas.filter(b => !b.collected && !(b.landed && b.landTimer > 360));
+
+  // Clouds drift
+  for (const c of clouds) {
+    c.x -= c.s;
+    if (c.x < -120) { c.x = W + 60; c.y = 40 + Math.random() * (H * 0.35); }
+  }
+
+  // Reached mom?
+  if (kid.worldX >= JOURNEY_LENGTH) finish();
+}
+
+// little particle pops
+let pops = [];
+function pop(x, y) {
+  for (let i = 0; i < 8; i++) {
+    pops.push({ x, y, vx: (Math.random() - 0.5) * 6, vy: -Math.random() * 5 - 1, life: 1 });
+  }
+}
+
+// ---- Draw ----
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  const camX = kid.worldX - W * 0.25;
+
+  // Clouds
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  for (const c of clouds) cloud(c.x, c.y, c.scale);
+
+  // Ground + grass texture
+  ctx.fillStyle = "#8bc34a";
+  ctx.fillRect(0, ground, W, H - ground);
+  ctx.strokeStyle = "#689f38";
+  ctx.lineWidth = 3;
+  for (let gx = -(camX % 40); gx < W; gx += 40) {
+    ctx.beginPath();
+    ctx.moveTo(gx, ground + 6);
+    ctx.lineTo(gx + 8, ground - 8);
+    ctx.stroke();
+  }
+  // Path
+  ctx.fillStyle = "#caa472";
+  ctx.fillRect(0, ground, W, 14);
+
+  // Trees (behind Maya)
+  for (const t of trees) {
+    const tx = t.worldX - camX;
+    if (tx < -160 || tx > W + 160) continue;
+    drawTree(tx, t);
+  }
+
+  // Bananas
+  for (const b of bananas) {
+    if (b.collected) continue;
+    const bx = b.worldX - camX;
+    if (bx < -50 || bx > W + 50) continue;
+    drawBanana(bx, b.y, b.rot);
+  }
+
+  // Mom's house at the end
+  const houseX = JOURNEY_LENGTH - camX + 40;
+  if (houseX < W + 300) drawHomeAndMom(houseX);
+
+  // Maya
+  drawKid(W * 0.25, kid.y);
+
+  // Pops
+  pops = pops.filter((p) => p.life > 0);
+  for (const p of pops) {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.3; p.life -= 0.04;
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = "#f5b301";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // "Shake!" tip when standing near a loaded tree
+  const tip = document.getElementById("shakeTip");
+  const tree = nearestTree();
+  if (tree && state === "playing") {
+    const tx = tree.worldX - camX;
+    tip.style.left = tx + "px";
+    tip.style.top = (ground - 210) + "px";
+    tip.classList.remove("hidden");
+  } else {
+    tip.classList.add("hidden");
+  }
+
+  // HUD
+  document.getElementById("score").textContent = score;
+  document.getElementById("progressFill").style.width =
+    Math.min(100, (distance / JOURNEY_LENGTH) * 100) + "%";
+}
+
+function cloud(x, y, s = 1) {
+  ctx.beginPath();
+  ctx.arc(x, y, 26 * s, 0, Math.PI * 2);
+  ctx.arc(x + 28 * s, y + 6 * s, 22 * s, 0, Math.PI * 2);
+  ctx.arc(x - 26 * s, y + 8 * s, 20 * s, 0, Math.PI * 2);
+  ctx.arc(x + 4 * s, y - 14 * s, 20 * s, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawTree(x, t) {
+  const lean = Math.sin(t.sway * Math.PI * 4) * t.sway * 0.12; // shake wobble
+  ctx.save();
+  ctx.translate(x, ground);
+  ctx.rotate(lean);
+
+  // trunk
+  ctx.fillStyle = "#9c6b3f";
+  ctx.beginPath();
+  ctx.moveTo(-9, 0);
+  ctx.quadraticCurveTo(-6, -90, -10, -160);
+  ctx.lineTo(8, -160);
+  ctx.quadraticCurveTo(8, -90, 9, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(120,80,40,0.5)";
+  ctx.lineWidth = 2;
+  for (let i = -130; i < -10; i += 22) {
+    ctx.beginPath(); ctx.moveTo(-8, i); ctx.lineTo(8, i + 4); ctx.stroke();
+  }
+
+  // palm fronds
+  ctx.fillStyle = "#43a047";
+  const fronds = [-1.2, -0.6, 0, 0.6, 1.2];
+  for (const a of fronds) {
+    ctx.save();
+    ctx.translate(0, -160);
+    ctx.rotate(a);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(60, -22, 120, 6);
+    ctx.quadraticCurveTo(62, 6, 0, 14);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.fillStyle = "#2e7d32";
+  ctx.beginPath(); ctx.arc(0, -160, 12, 0, Math.PI * 2); ctx.fill();
+
+  // bananas still hanging
+  if (t.bunch > 0) {
+    ctx.translate(6, -150);
+    for (let i = 0; i < t.bunch; i++) {
+      const bx = (i % 3) * 9 - 9;
+      const by = Math.floor(i / 3) * 10 + 6;
+      ctx.fillStyle = "#f5b301";
+      ctx.beginPath();
+      ctx.ellipse(bx, by, 5, 11, 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawBanana(x, y, rot = 0) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  // crescent banana
+  ctx.fillStyle = "#f5b301";
+  ctx.beginPath();
+  ctx.moveTo(-12, -6);
+  ctx.quadraticCurveTo(0, 16, 14, -4);
+  ctx.quadraticCurveTo(2, 8, -12, -6);
+  ctx.fill();
+  ctx.strokeStyle = "#d99e00";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // tips
+  ctx.fillStyle = "#7b4a2d";
+  ctx.beginPath(); ctx.arc(-12, -6, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(14, -4, 2, 0, Math.PI * 2); ctx.fill();
+  // shine
+  ctx.strokeStyle = "rgba(255,255,255,0.7)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-8, -3);
+  ctx.quadraticCurveTo(0, 6, 8, -3);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawKid(cx, footY) {
+  const moving = (keys.left || keys.right);
+  const bob = moving ? Math.sin(kid.walkPhase) * 3 : 0;
+  const y = footY + bob;
+  ctx.save();
+  ctx.translate(cx, 0);
+  ctx.scale(kid.face, 1);
+
+  // legs (walking)
+  const swing = moving ? Math.sin(kid.walkPhase) * 8 : 0;
+  ctx.strokeStyle = "#34495e";
+  ctx.lineWidth = 7;
+  ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(-6, y - 28); ctx.lineTo(-6 + swing, y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(6, y - 28); ctx.lineTo(6 - swing, y); ctx.stroke();
+
+  // dress (girl)
+  ctx.fillStyle = "#e84393";
+  ctx.beginPath();
+  ctx.moveTo(-15, y - 24);
+  ctx.lineTo(15, y - 24);
+  ctx.lineTo(11, y - 60);
+  ctx.lineTo(-11, y - 60);
+  ctx.closePath();
+  ctx.fill();
+
+  // arms (reach up a bit while walking)
+  ctx.strokeStyle = "#f1c27d";
+  ctx.beginPath(); ctx.moveTo(-12, y - 52); ctx.lineTo(-22, y - 38 + swing / 2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(12, y - 52); ctx.lineTo(22, y - 38 - swing / 2); ctx.stroke();
+
+  // head
+  ctx.fillStyle = "#f1c27d";
+  ctx.beginPath(); ctx.arc(0, y - 74, 16, 0, Math.PI * 2); ctx.fill();
+  // hair with side ponytails
+  ctx.fillStyle = "#4e342e";
+  ctx.beginPath(); ctx.arc(0, y - 80, 16, Math.PI, 0); ctx.fill();
+  ctx.beginPath(); ctx.arc(-16, y - 74, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(16, y - 74, 6, 0, Math.PI * 2); ctx.fill();
+  // face
+  ctx.fillStyle = "#2c3e50";
+  ctx.beginPath(); ctx.arc(6, y - 74, 2.2, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "#c0392b";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(5, y - 70, 5, 0.1, Math.PI - 0.1); ctx.stroke();
+
+  // a little basket of bananas that grows with score
+  if (score > 0) {
+    ctx.fillStyle = "#8d6e63";
+    roundRect(14, y - 34, 16, 12, 3); ctx.fill();
+    const n = Math.min(score, 5);
+    for (let i = 0; i < n; i++) {
+      ctx.fillStyle = "#f5b301";
+      ctx.beginPath();
+      ctx.ellipse(18 + (i % 3) * 5, y - 36 - Math.floor(i / 3) * 4, 2.4, 4.5, 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawHomeAndMom(x) {
+  // house
+  ctx.fillStyle = "#f5deb3";
+  ctx.fillRect(x, ground - 130, 160, 130);
+  ctx.fillStyle = "#c0392b"; // roof
+  ctx.beginPath();
+  ctx.moveTo(x - 14, ground - 130);
+  ctx.lineTo(x + 80, ground - 200);
+  ctx.lineTo(x + 174, ground - 130);
+  ctx.closePath(); ctx.fill();
+  // door
+  ctx.fillStyle = "#8d6e63";
+  ctx.fillRect(x + 110, ground - 70, 36, 70);
+  // window
+  ctx.fillStyle = "#aed6f1";
+  ctx.fillRect(x + 24, ground - 100, 40, 40);
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
+  ctx.strokeRect(x + 24, ground - 100, 40, 40);
+
+  // Mom standing by the door, waving
+  const mx = x + 80, my = ground;
+  ctx.strokeStyle = "#1565c0"; ctx.lineWidth = 7; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(mx - 5, my - 30); ctx.lineTo(mx - 5, my); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(mx + 5, my - 30); ctx.lineTo(mx + 5, my); ctx.stroke();
+  // dress
+  ctx.fillStyle = "#1565c0";
+  ctx.beginPath();
+  ctx.moveTo(mx - 16, my - 30);
+  ctx.lineTo(mx + 16, my - 30);
+  ctx.lineTo(mx + 10, my - 70);
+  ctx.lineTo(mx - 10, my - 70);
+  ctx.closePath(); ctx.fill();
+  // waving arm
+  const wave = Math.sin(Date.now() / 200) * 0.4;
+  ctx.strokeStyle = "#f1c27d";
+  ctx.save();
+  ctx.translate(mx + 8, my - 64);
+  ctx.rotate(-0.8 + wave);
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(20, 0); ctx.stroke();
+  ctx.restore();
+  ctx.beginPath(); ctx.moveTo(mx - 8, my - 64); ctx.lineTo(mx - 22, my - 48); ctx.stroke();
+  // head + hair
+  ctx.fillStyle = "#f1c27d";
+  ctx.beginPath(); ctx.arc(mx, my - 84, 14, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#4e342e";
+  ctx.beginPath(); ctx.arc(mx, my - 88, 15, Math.PI, 0); ctx.fill();
+  ctx.fillRect(mx - 15, my - 88, 5, 18);
+  ctx.fillRect(mx + 10, my - 88, 5, 18);
+  // smile
+  ctx.strokeStyle = "#c0392b"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(mx, my - 82, 5, 0.1, Math.PI - 0.1); ctx.stroke();
+
+  // heart
+  const hb = 1 + Math.sin(Date.now() / 300) * 0.1;
+  heart(mx, my - 115, 10 * hb);
+}
+
+function heart(x, y, s) {
+  ctx.fillStyle = "#e84393";
+  ctx.beginPath();
+  ctx.moveTo(x, y + s * 0.8);
+  ctx.bezierCurveTo(x + s, y - s * 0.4, x + s * 0.6, y - s, x, y - s * 0.3);
+  ctx.bezierCurveTo(x - s * 0.6, y - s, x - s, y - s * 0.4, x, y + s * 0.8);
+  ctx.fill();
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// ---- Loop ----
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ---- Screens ----
+const startScreen = document.getElementById("startScreen");
+const endScreen = document.getElementById("endScreen");
+
+function finish() {
+  state = "done";
+  keys.left = keys.right = false;
+  document.getElementById("shakeTip").classList.add("hidden");
+  let totalOnTrees = 0;
+  for (const t of trees) totalOnTrees += t.bunch;
+  const possible = score + totalOnTrees + bananas.filter(b => !b.collected).length;
+  document.getElementById("endTitle").textContent = "Maya gives Mom the bananas! 💛";
+  let stars = "⭐⭐⭐";
+  if (score < possible * 0.4) stars = "⭐";
+  else if (score < possible * 0.75) stars = "⭐⭐";
+  document.getElementById("endMsg").innerHTML =
+    `She brought home <b>${score}</b> banana${score === 1 ? "" : "s"}.<br>` +
+    `"Yummy! Thank you, my love," says Mom. 🤗<br><br>${stars}`;
+  endScreen.classList.remove("hidden");
+}
+
+document.getElementById("startBtn").addEventListener("click", () => {
+  startScreen.classList.add("hidden");
+  reset();
+});
+document.getElementById("againBtn").addEventListener("click", () => {
+  endScreen.classList.add("hidden");
+  reset();
+});
+
+// init in idle state so something renders behind start screen
+reset();
+state = "idle";
+loop();
+</script>
+</body>
+</html>
