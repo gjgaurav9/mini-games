@@ -13,11 +13,13 @@ A cozy little collection of browser mini-games. Each one is a single, self-conta
 | 🍎 | **[Apples for Mom](apple-collecting-game/index.html)** | Help Lily walk home, collect apples and jump the puddles, then give them all to Mom. |
 | 🍌 | **[Collect Banana](collect-banana/index.html)** | Maya shakes the banana trees, catches the falling bananas, and brings the bunch home to Mom. |
 | 🥦 | **[Broccoli Garden](broccoli-collection-game/index.html)** | Ben picks ripe broccoli from the garden beds before the hungry bunnies nibble it, then brings the harvest home to Mom. |
+| 🎯 | **[Carrom (Karam)](carrom-board-game/index.html)** | The classic board game — slingshot the striker to pot all 19 coins and the Queen into the corner pockets in as few strikes as possible. |
 
 ## Controls
 
-- **← →** — walk
+- **← →** — walk (collection games) / nudge the striker (Carrom)
 - **↑ / Space** — jump (Apples), shake the tree (Banana), or pick the broccoli (Broccoli Garden)
+- **Carrom** — drag the striker left/right to position it, then pull back from it and release to flick (works with mouse or touch)
 - **Mobile** — tap the screen sides to walk, tap the middle to jump / shake / pick
 
 ## Running locally

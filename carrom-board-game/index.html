@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🎯 Carrom (Karam)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    font-family: "Comic Sans MS", "Trebuchet MS", sans-serif;
+    overflow: hidden;
+    background: #2c3e50;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+  #game {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: radial-gradient(circle at 50% 35%, #34495e 0%, #232f3a 100%);
+    overflow: hidden;
+  }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    padding: 24px;
+    z-index: 10;
+  }
+  .overlay h1 { font-size: clamp(32px, 7vw, 64px); text-shadow: 3px 3px 0 #b8860b; }
+  .overlay p { font-size: clamp(15px, 3vw, 23px); margin: 12px 0; max-width: 620px; }
+  .btn {
+    margin-top: 18px;
+    padding: 14px 34px;
+    font-size: clamp(18px, 4vw, 28px);
+    font-family: inherit;
+    border: none;
+    border-radius: 50px;
+    background: #f1c40f;
+    color: #5a4500;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #b8860b;
+    transition: transform .05s;
+  }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #b8860b; }
+  .hidden { display: none !important; }
+
+  #hud {
+    position: absolute;
+    top: 14px; left: 14px;
+    z-index: 5;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .pill {
+    background: rgba(255,255,255,0.9);
+    padding: 8px 16px;
+    border-radius: 16px;
+    font-size: clamp(15px, 3.4vw, 22px);
+    color: #2c3e50;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  }
+  #resetBtn {
+    position: absolute;
+    top: 14px; right: 14px;
+    z-index: 5;
+    background: rgba(255,255,255,0.9);
+    border: none;
+    font-family: inherit;
+    padding: 8px 16px;
+    border-radius: 16px;
+    font-size: clamp(14px, 3.2vw, 20px);
+    color: #2c3e50;
+    cursor: pointer;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  }
+  #resetBtn:active { transform: translateY(2px); }
+
+  .hint {
+    position: absolute;
+    bottom: 14px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    color: #ecf0f1;
+    background: rgba(0,0,0,0.35);
+    padding: 6px 16px;
+    border-radius: 14px;
+    font-size: clamp(12px, 3vw, 17px);
+    text-align: center;
+    max-width: 92vw;
+  }
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="canvas"></canvas>
+
+  <div id="hud">
+    <div class="pill">🎯 Potted <span id="potted">0</span>/19</div>
+    <div class="pill">🎽 Strikes <span id="strikes">0</span></div>
+    <div class="pill" id="queenPill">👑 Queen: <span id="queenState">on board</span></div>
+  </div>
+  <button id="resetBtn">↺ New Game</button>
+
+  <div class="hint">Drag the <b>striker</b> left/right to position it • pull back from it and release to flick • pot all the coins!</div>
+
+  <!-- Start screen -->
+  <div id="startScreen" class="overlay">
+    <h1>🎯 Carrom</h1>
+    <p>The classic <b>Karam</b> board! Slide the striker along your line, then
+       pull back and let go — like a slingshot — to flick it into the coins.
+       Sink every coin into the corner pockets in as few strikes as you can.
+       Don't forget the golden <b>Queen</b> 👑!</p>
+    <button class="btn" id="startBtn">Play</button>
+  </div>
+
+  <!-- End screen -->
+  <div id="endScreen" class="overlay hidden">
+    <h1>Board cleared! 🎉</h1>
+    <p id="endMsg"></p>
+    <button class="btn" id="againBtn">Play Again</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+// ---- Geometry (recomputed on resize) ----
+let W, H, S, BX, BY, frame, coinR, strikerR, pocketR;
+let cx, cy, baselineY, slideMin, slideMax, leftW, rightW, topW, botW, pockets;
+
+function computeLayout() {
+  W = canvas.clientWidth;
+  H = canvas.clientHeight;
+  // square board, leave room for the HUD at the top
+  S = Math.min(W * 0.96, H * 0.92);
+  BX = (W - S) / 2;
+  BY = (H - S) / 2 + Math.min(18, H * 0.02);
+  frame = S * 0.06;
+  pocketR = S * 0.05;
+  coinR = S * 0.021;
+  strikerR = S * 0.028;
+  cx = BX + S / 2;
+  cy = BY + S / 2;
+  leftW = BX + frame; rightW = BX + S - frame;
+  topW = BY + frame;  botW = BY + S - frame;
+  baselineY = BY + S - frame - S * 0.10;
+  slideMin = BX + S * 0.22;
+  slideMax = BX + S * 0.78;
+  pockets = [
+    { x: leftW + pocketR * 0.25, y: topW + pocketR * 0.25 },
+    { x: rightW - pocketR * 0.25, y: topW + pocketR * 0.25 },
+    { x: leftW + pocketR * 0.25, y: botW - pocketR * 0.25 },
+    { x: rightW - pocketR * 0.25, y: botW - pocketR * 0.25 },
+  ];
+}
+
+// ---- Game state ----
+let pieces, striker, state, strikes, queenPotted, queenState;
+// aim
+let pointerId = null, aiming = false, sliding = false, aim = { x: 0, y: 0 };
+let strikerHomeX;
+
+const FRICTION = 0.985;
+const STOP_V = 0.06;
+const WALL_E = 0.62;       // wall restitution
+const COIN_E = 0.96;       // coin-coin restitution
+const SUBSTEPS = 5;
+const COIN_MASS = 1;
+const STRIKER_MASS = 1.7;
+
+function makeRack() {
+  pieces = [];
+  const r1 = coinR * 2.18;
+  const r2 = coinR * 4.4;
+  // Queen in the centre
+  pieces.push({ x: cx, y: cy, vx: 0, vy: 0, r: coinR, type: "coin", color: "queen", active: true });
+  // inner ring of 6
+  let blackTurn = true;
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i - Math.PI / 2;
+    pieces.push({
+      x: cx + Math.cos(a) * r1, y: cy + Math.sin(a) * r1,
+      vx: 0, vy: 0, r: coinR, type: "coin",
+      color: blackTurn ? "black" : "white", active: true
+    });
+    blackTurn = !blackTurn;
+  }
+  // outer ring of 12
+  for (let i = 0; i < 12; i++) {
+    const a = (Math.PI / 6) * i - Math.PI / 2;
+    pieces.push({
+      x: cx + Math.cos(a) * r2, y: cy + Math.sin(a) * r2,
+      vx: 0, vy: 0, r: coinR, type: "coin",
+      color: i % 2 === 0 ? "black" : "white", active: true
+    });
+  }
+}
+
+function placeStriker(x) {
+  strikerHomeX = Math.max(slideMin, Math.min(slideMax, x));
+  striker = { x: strikerHomeX, y: baselineY, vx: 0, vy: 0, r: strikerR, type: "striker", active: true };
+}
+
+function newGame() {
+  computeLayout();
+  makeRack();
+  placeStriker(cx);
+  strikes = 0;
+  queenPotted = false;
+  queenState = "on board";
+  state = "ready";
+  updateHUD();
+  endScreen.classList.add("hidden");
+}
+
+// ---- Resize: rescale an in-progress game so nothing teleports ----
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = canvas.clientWidth * DPR;
+  canvas.height = canvas.clientHeight * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  const old = { BX, BY, S };
+  computeLayout();
+  if (pieces && old.S) {
+    const k = S / old.S;
+    const remap = (p) => {
+      p.x = BX + ((p.x - old.BX) / old.S) * S;
+      p.y = BY + ((p.y - old.BY) / old.S) * S;
+      p.vx *= k; p.vy *= k; p.r *= k;
+    };
+    pieces.forEach(remap);
+    if (striker) remap(striker);
+    // rescale the striker's home position into the new board coordinates
+    strikerHomeX = BX + ((strikerHomeX - old.BX) / old.S) * S;
+    strikerHomeX = Math.max(slideMin, Math.min(slideMax, strikerHomeX));
+    if (state === "ready" && striker) { striker.x = strikerHomeX; striker.y = baselineY; }
+  }
+}
+window.addEventListener("resize", resize);
+
+// ---- Input (pointer = mouse + touch) ----
+function pointerPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+canvas.addEventListener("pointerdown", (e) => {
+  if (state !== "ready") return;
+  const p = pointerPos(e);
+  const d = Math.hypot(p.x - striker.x, p.y - striker.y);
+  pointerId = e.pointerId;
+  canvas.setPointerCapture(e.pointerId);
+  if (d < strikerR * 1.7) {
+    sliding = true;          // grab the striker to reposition it
+  } else {
+    aiming = true;           // pull back to aim
+    aim = p;
+  }
+  e.preventDefault();
+});
+canvas.addEventListener("pointermove", (e) => {
+  if (e.pointerId !== pointerId) return;
+  const p = pointerPos(e);
+  if (sliding) {
+    striker.x = Math.max(slideMin, Math.min(slideMax, p.x));
+    striker.y = baselineY;
+    strikerHomeX = striker.x;
+  } else if (aiming) {
+    aim = p;
+  }
+  e.preventDefault();
+});
+canvas.addEventListener("pointerup", (e) => {
+  if (e.pointerId !== pointerId) return;
+  if (aiming) shoot();
+  aiming = false; sliding = false; pointerId = null;
+  e.preventDefault();
+});
+canvas.addEventListener("pointercancel", () => { aiming = false; sliding = false; pointerId = null; });
+
+// keyboard nudging for accessibility
+addEventListener("keydown", (e) => {
+  if (state !== "ready") return;
+  if (e.key === "ArrowLeft")  { striker.x = Math.max(slideMin, striker.x - S * 0.02); strikerHomeX = striker.x; }
+  if (e.key === "ArrowRight") { striker.x = Math.min(slideMax, striker.x + S * 0.02); strikerHomeX = striker.x; }
+});
+
+function launchVector() {
+  // slingshot: pull away from the striker, it flies the opposite way
+  let dx = striker.x - aim.x;
+  let dy = striker.y - aim.y;
+  const pull = Math.hypot(dx, dy);
+  const maxPull = S * 0.33;
+  const minPull = S * 0.03;
+  if (pull < minPull) return null;
+  const clamped = Math.min(pull, maxPull);
+  const speed = (clamped / maxPull) * (S * 0.072);
+  return { vx: (dx / pull) * speed, vy: (dy / pull) * speed };
+}
+
+function shoot() {
+  const v = launchVector();
+  if (!v) return;
+  striker.vx = v.vx; striker.vy = v.vy;
+  strikerHomeX = striker.x;
+  strikes++;
+  state = "moving";
+  updateHUD();
+}
+
+// ---- Physics ----
+function collide(a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const dist = Math.hypot(dx, dy);
+  const min = a.r + b.r;
+  if (dist === 0 || dist >= min) return;
+  const nx = dx / dist, ny = dy / dist;
+  const ma = a.type === "striker" ? STRIKER_MASS : COIN_MASS;
+  const mb = b.type === "striker" ? STRIKER_MASS : COIN_MASS;
+  // positional separation (split by inverse mass) — no energy added
+  const overlap = min - dist;
+  const totalInv = 1 / ma + 1 / mb;
+  a.x -= nx * overlap * (1 / ma) / totalInv;
+  a.y -= ny * overlap * (1 / ma) / totalInv;
+  b.x += nx * overlap * (1 / mb) / totalInv;
+  b.y += ny * overlap * (1 / mb) / totalInv;
+  // impulse along normal
+  const rvx = b.vx - a.vx, rvy = b.vy - a.vy;
+  const relN = rvx * nx + rvy * ny;
+  if (relN > 0) return; // already separating
+  const j = (-(1 + COIN_E) * relN) / totalInv;
+  const ix = j * nx, iy = j * ny;
+  a.vx -= ix / ma; a.vy -= iy / ma;
+  b.vx += ix / mb; b.vy += iy / mb;
+}
+
+function wallBounce(p) {
+  if (p.x - p.r < leftW)  { p.x = leftW + p.r;  p.vx = Math.abs(p.vx) * WALL_E; }
+  if (p.x + p.r > rightW) { p.x = rightW - p.r; p.vx = -Math.abs(p.vx) * WALL_E; }
+  if (p.y - p.r < topW)   { p.y = topW + p.r;   p.vy = Math.abs(p.vy) * WALL_E; }
+  if (p.y + p.r > botW)   { p.y = botW - p.r;   p.vy = -Math.abs(p.vy) * WALL_E; }
+}
+
+function checkPocket(p) {
+  for (const pk of pockets) {
+    if (Math.hypot(p.x - pk.x, p.y - pk.y) < pocketR * 0.92) return true;
+  }
+  return false;
+}
+
+let pots = []; // pocket animations
+function potFx(x, y, color) {
+  pots.push({ x, y, color, life: 1 });
+}
+
+function step() {
+  const all = [striker, ...pieces.filter(p => p.active)];
+  for (let s = 0; s < SUBSTEPS; s++) {
+    for (const p of all) {
+      if (!p.active) continue;
+      p.x += p.vx / SUBSTEPS;
+      p.y += p.vy / SUBSTEPS;
+    }
+    // collisions
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i + 1; j < all.length; j++) {
+        if (all[i].active && all[j].active) collide(all[i], all[j]);
+      }
+    }
+    // walls + pockets
+    for (const p of all) {
+      if (!p.active) continue;
+      if (checkPocket(p)) {
+        p.active = false;
+        p.vx = p.vy = 0;
+        potFx(p.x, p.y, p.type === "striker" ? "striker" : p.color);
+        if (p.type === "coin") {
+          if (p.color === "queen") { queenPotted = true; queenState = "potted! 👑"; }
+        }
+        continue;
+      }
+      wallBounce(p);
+    }
+  }
+  // friction + settle
+  for (const p of all) {
+    if (!p.active) continue;
+    p.vx *= FRICTION; p.vy *= FRICTION;
+    if (Math.hypot(p.vx, p.vy) < STOP_V) { p.vx = 0; p.vy = 0; }
+  }
+  // motion ended?
+  let moving = false;
+  for (const p of all) if (p.active && (p.vx || p.vy)) moving = true;
+  if (!moving) finishShot();
+}
+
+function finishShot() {
+  // bring the striker back to the player's line
+  if (!striker.active) {
+    striker.active = true; // foul: it just comes back, no penalty (kid friendly)
+  }
+  striker.x = Math.max(slideMin, Math.min(slideMax, strikerHomeX));
+  striker.y = baselineY;
+  striker.vx = striker.vy = 0;
+
+  const left = pieces.filter(p => p.active).length;
+  if (left === 0) { win(); }
+  else { state = "ready"; }
+  updateHUD();
+}
+
+// ---- Render ----
+function rr(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawBoard() {
+  // outer wooden frame
+  ctx.fillStyle = "#5a3210";
+  rr(BX, BY, S, S, S * 0.03); ctx.fill();
+  // frame grain lines
+  ctx.strokeStyle = "rgba(0,0,0,0.18)"; ctx.lineWidth = 2;
+  for (let i = 1; i < 5; i++) {
+    const o = (frame / 5) * i;
+    ctx.strokeRect(BX + o, BY + o, S - 2 * o, S - 2 * o);
+  }
+  // playing surface
+  const surf = ctx.createLinearGradient(BX, BY, BX + S, BY + S);
+  surf.addColorStop(0, "#f3d9a4");
+  surf.addColorStop(0.5, "#ecc987");
+  surf.addColorStop(1, "#e3b86d");
+  ctx.fillStyle = surf;
+  rr(leftW, topW, rightW - leftW, botW - topW, S * 0.01); ctx.fill();
+
+  // decorative borders
+  ctx.strokeStyle = "#8d5524"; ctx.lineWidth = Math.max(2, S * 0.006);
+  ctx.strokeRect(leftW + frame * 0.2, topW + frame * 0.2,
+                 (rightW - leftW) - frame * 0.4, (botW - topW) - frame * 0.4);
+
+  // base lines + end circles on all four sides
+  ctx.strokeStyle = "#c0392b"; ctx.fillStyle = "#c0392b";
+  const inset = S * 0.16, lineOff = S * 0.135, rEnd = S * 0.022;
+  const a = leftW + inset, b = rightW - inset;
+  const drawBase = (horizontal, fixed) => {
+    ctx.lineWidth = Math.max(2, S * 0.007);
+    ctx.beginPath();
+    if (horizontal) { ctx.moveTo(a, fixed); ctx.lineTo(b, fixed); }
+    else { ctx.moveTo(fixed, a); ctx.lineTo(fixed, b); }
+    ctx.stroke();
+    const ends = horizontal ? [[a, fixed], [b, fixed]] : [[fixed, a], [fixed, b]];
+    for (const [ex, ey] of ends) {
+      ctx.beginPath(); ctx.arc(ex, ey, rEnd, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff"; ctx.fill();
+      ctx.lineWidth = Math.max(1.5, S * 0.004); ctx.strokeStyle = "#c0392b"; ctx.stroke();
+    }
+  };
+  drawBase(true, topW + lineOff);
+  drawBase(true, botW - lineOff);
+  drawBase(false, leftW + lineOff);
+  drawBase(false, rightW - lineOff);
+
+  // centre circle + sun design
+  ctx.strokeStyle = "#b8860b"; ctx.lineWidth = Math.max(2, S * 0.006);
+  ctx.beginPath(); ctx.arc(cx, cy, S * 0.085, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = "rgba(184,134,11,0.18)";
+  ctx.beginPath(); ctx.arc(cx, cy, S * 0.05, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "rgba(184,134,11,0.55)"; ctx.lineWidth = Math.max(1.5, S * 0.004);
+  for (let i = 0; i < 12; i++) {
+    const ang = (Math.PI / 6) * i;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(ang) * S * 0.05, cy + Math.sin(ang) * S * 0.05);
+    ctx.lineTo(cx + Math.cos(ang) * S * 0.083, cy + Math.sin(ang) * S * 0.083);
+    ctx.stroke();
+  }
+  // corner arrow decorations near pockets
+  ctx.strokeStyle = "#c0392b"; ctx.lineWidth = Math.max(1.5, S * 0.004);
+  const arr = S * 0.07;
+  const corners = [[leftW, topW, 1, 1], [rightW, topW, -1, 1], [leftW, botW, 1, -1], [rightW, botW, -1, -1]];
+  for (const [px, py, sx, sy] of corners) {
+    ctx.beginPath();
+    ctx.moveTo(px + sx * pocketR * 1.4, py + sy * pocketR * 1.4 + sy * arr);
+    ctx.lineTo(px + sx * pocketR * 1.4, py + sy * pocketR * 1.4);
+    ctx.lineTo(px + sx * pocketR * 1.4 + sx * arr, py + sy * pocketR * 1.4);
+    ctx.stroke();
+  }
+
+  // pockets
+  for (const pk of pockets) {
+    ctx.fillStyle = "#1b1b1b";
+    ctx.beginPath(); ctx.arc(pk.x, pk.y, pocketR, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#000"; ctx.lineWidth = Math.max(2, S * 0.01);
+    ctx.beginPath(); ctx.arc(pk.x, pk.y, pocketR, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.beginPath(); ctx.arc(pk.x - pocketR * 0.3, pk.y - pocketR * 0.3, pocketR * 0.4, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+function drawDisc(p) {
+  ctx.save();
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,0.22)";
+  ctx.beginPath(); ctx.ellipse(p.x + p.r * 0.18, p.y + p.r * 0.28, p.r * 0.95, p.r * 0.7, 0, 0, Math.PI * 2); ctx.fill();
+
+  let base, edge, hi;
+  if (p.type === "striker") { base = "#f7f7f7"; edge = "#1f6fb2"; hi = "#ffffff"; }
+  else if (p.color === "white") { base = "#f3e7c9"; edge = "#caa86a"; hi = "#fff7e6"; }
+  else if (p.color === "black") { base = "#3b2f2a"; edge = "#15100d"; hi = "#6b554a"; }
+  else { base = "#d63031"; edge = "#8e1b1c"; hi = "#ff7675"; } // queen
+
+  const g = ctx.createRadialGradient(p.x - p.r * 0.3, p.y - p.r * 0.35, p.r * 0.2, p.x, p.y, p.r);
+  g.addColorStop(0, hi);
+  g.addColorStop(0.65, base);
+  g.addColorStop(1, edge);
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+  // rim
+  ctx.strokeStyle = edge; ctx.lineWidth = Math.max(1, p.r * 0.12);
+  ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 0.92, 0, Math.PI * 2); ctx.stroke();
+  // inner ring detail
+  ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = Math.max(1, p.r * 0.07);
+  ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 0.55, 0, Math.PI * 2); ctx.stroke();
+  if (p.type === "coin" && p.color === "queen") {
+    ctx.fillStyle = "#ffd700";
+    ctx.font = `${p.r * 1.1}px serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("♛", p.x, p.y + p.r * 0.08);
+  }
+  ctx.restore();
+}
+
+function drawAim() {
+  if (!aiming || state !== "ready") return;
+  const v = launchVector();
+  // pull-back line
+  ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
+  ctx.beginPath(); ctx.moveTo(striker.x, striker.y); ctx.lineTo(aim.x, aim.y); ctx.stroke();
+  ctx.setLineDash([]);
+  if (!v) return;
+  // forward aim guide
+  const len = S * 0.42;
+  const sp = Math.hypot(v.vx, v.vy);
+  const ux = v.vx / sp, uy = v.vy / sp;
+  ctx.strokeStyle = "rgba(46,204,113,0.9)"; ctx.lineWidth = 3; ctx.setLineDash([4, 8]);
+  ctx.beginPath(); ctx.moveTo(striker.x, striker.y);
+  ctx.lineTo(striker.x + ux * len, striker.y + uy * len); ctx.stroke();
+  ctx.setLineDash([]);
+  // power meter ring
+  const pw = Math.min(1, sp / (S * 0.072));
+  ctx.strokeStyle = `rgba(${Math.round(255 * pw)},${Math.round(200 * (1 - pw) + 55)},60,0.95)`;
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(striker.x, striker.y, strikerR + 8, -Math.PI / 2, -Math.PI / 2 + pw * Math.PI * 2); ctx.stroke();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  drawBoard();
+  // coins
+  for (const p of pieces) if (p.active) drawDisc(p);
+  // striker
+  if (striker.active) drawDisc(striker);
+  // aiming guides
+  drawAim();
+  // a soft "place me" pulse on the striker when ready
+  if (state === "ready" && !aiming && !sliding) {
+    const t = (Math.sin(Date.now() / 400) + 1) / 2;
+    ctx.strokeStyle = `rgba(46,204,113,${0.25 + t * 0.4})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(striker.x, striker.y, strikerR + 5 + t * 4, 0, Math.PI * 2); ctx.stroke();
+  }
+  // pot effects
+  pots = pots.filter(f => f.life > 0);
+  for (const f of pots) {
+    f.life -= 0.05;
+    ctx.globalAlpha = Math.max(0, f.life);
+    ctx.fillStyle = "#f1c40f";
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI / 3) * i;
+      const d = (1 - f.life) * pocketR * 1.6;
+      ctx.beginPath(); ctx.arc(f.x + Math.cos(a) * d, f.y + Math.sin(a) * d, 3, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+function loop() {
+  if (state === "moving") step();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ---- HUD / screens ----
+const startScreen = document.getElementById("startScreen");
+const endScreen = document.getElementById("endScreen");
+function updateHUD() {
+  const potted = 19 - pieces.filter(p => p.active).length;
+  document.getElementById("potted").textContent = potted;
+  document.getElementById("strikes").textContent = strikes;
+  document.getElementById("queenState").textContent = queenState;
+}
+function win() {
+  state = "won";
+  let stars = "⭐";
+  if (strikes <= 14) stars = "⭐⭐⭐";
+  else if (strikes <= 22) stars = "⭐⭐";
+  document.getElementById("endMsg").innerHTML =
+    `You sank all 19 coins in <b>${strikes}</b> strike${strikes === 1 ? "" : "s"}.<br>` +
+    (queenPotted ? "You bagged the Queen too! 👑<br><br>" : "<br>") + stars;
+  endScreen.classList.remove("hidden");
+}
+
+document.getElementById("startBtn").addEventListener("click", () => {
+  startScreen.classList.add("hidden");
+  newGame();
+});
+document.getElementById("againBtn").addEventListener("click", newGame);
+document.getElementById("resetBtn").addEventListener("click", () => {
+  if (state === "moving") return; // don't reset mid-shot
+  newGame();
+});
+
+// ---- Boot ----
+resize();
+newGame();
+state = "idle";   // hold until the player presses Play
+loop();
+</script>
+</body>
+</html>
