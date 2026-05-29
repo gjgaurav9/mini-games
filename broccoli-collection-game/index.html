@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🥦 Broccoli Garden</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    font-family: "Comic Sans MS", "Trebuchet MS", sans-serif;
+    overflow: hidden;
+    background: #87ceeb;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #game {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(#bfe9ff 0%, #d9f3ff 52%, #cdeb6e 52%, #a7d24f 100%);
+    overflow: hidden;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: rgba(0,0,0,0.45);
+    color: #fff;
+    padding: 24px;
+    z-index: 10;
+  }
+  .overlay h1 { font-size: clamp(32px, 7vw, 64px); text-shadow: 3px 3px 0 #2e7d32; }
+  .overlay p { font-size: clamp(16px, 3vw, 24px); margin: 14px 0; max-width: 640px; }
+  .btn {
+    margin-top: 18px;
+    padding: 14px 34px;
+    font-size: clamp(18px, 4vw, 28px);
+    font-family: inherit;
+    border: none;
+    border-radius: 50px;
+    background: #66bb6a;
+    color: #14380f;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #2e7d32;
+    transition: transform .05s;
+  }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #2e7d32; }
+  .hidden { display: none !important; }
+
+  #hud {
+    position: absolute;
+    top: 14px; left: 14px;
+    z-index: 5;
+    background: rgba(255,255,255,0.85);
+    padding: 10px 18px;
+    border-radius: 16px;
+    font-size: clamp(18px, 4vw, 26px);
+    color: #2c3e50;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+  }
+  #progressWrap {
+    position: absolute;
+    top: 14px; right: 14px;
+    z-index: 5;
+    width: min(38vw, 280px);
+    background: rgba(255,255,255,0.85);
+    padding: 8px 12px;
+    border-radius: 16px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+  }
+  #progressWrap .label { font-size: 13px; color: #2c3e50; margin-bottom: 4px; }
+  #progressBar { height: 12px; background: #dfe6e9; border-radius: 8px; overflow: hidden; }
+  #progressFill { height: 100%; width: 0%; background: #66bb6a; border-radius: 8px; transition: width .15s; }
+
+  .hint {
+    position: absolute;
+    bottom: 16px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    color: #2c3e50;
+    background: rgba(255,255,255,0.7);
+    padding: 6px 16px;
+    border-radius: 14px;
+    font-size: clamp(13px, 3vw, 18px);
+  }
+  /* floating "Pick!" prompt */
+  #pickTip {
+    position: absolute;
+    z-index: 6;
+    transform: translate(-50%, -100%);
+    background: #66bb6a;
+    color: #14380f;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: clamp(13px, 3vw, 18px);
+    font-weight: bold;
+    white-space: nowrap;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.25);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="canvas"></canvas>
+
+  <div id="hud">🥦 <span id="score">0</span></div>
+  <div id="progressWrap">
+    <div class="label">Walk home to Mom 🏡</div>
+    <div id="progressBar"><div id="progressFill"></div></div>
+  </div>
+  <div class="hint">⬅️ ➡️ walk &nbsp;•&nbsp; ⬆️ / Space pick the broccoli &nbsp;•&nbsp; on mobile: tap sides to walk, tap middle to pick</div>
+
+  <div id="pickTip" class="hidden">Tap / Space to pick! 🥦</div>
+
+  <!-- Start screen -->
+  <div id="startScreen" class="overlay">
+    <h1>🥦 Broccoli Garden</h1>
+    <p>Ben strolls through the vegetable garden. Fresh broccoli is growing in
+       the beds — stand by a ripe one and <b>pick it</b>! But watch out:
+       hungry bunnies hop in to nibble the broccoli, so be quick. Fill your
+       basket and bring it all home to Mom. 💚</p>
+    <button class="btn" id="startBtn">Start the Walk</button>
+  </div>
+
+  <!-- End screen -->
+  <div id="endScreen" class="overlay hidden">
+    <h1 id="endTitle">You made it! 🏡</h1>
+    <p id="endMsg"></p>
+    <button class="btn" id="againBtn">Play Again</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let W, H, ground;
+function resize() {
+  W = canvas.width = canvas.clientWidth;
+  H = canvas.height = canvas.clientHeight;
+  ground = H * 0.82;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// ---- Game state ----
+const JOURNEY_LENGTH = 6000; // world units to reach mom
+let state, score, distance, kid, plants, bunnies, clouds, keys, pickNow;
+
+function reset() {
+  state = "playing";
+  score = 0;
+  distance = 0;
+  pickNow = false;
+  keys = { left: false, right: false };
+  kid = {
+    worldX: 0,
+    y: ground,
+    w: 46, h: 70,
+    face: 1, walkPhase: 0
+  };
+  plants = [];
+  bunnies = [];
+  clouds = [];
+
+  // Broccoli plants growing in beds along the path.
+  // ripe: ready to pick · eaten: a bunny got it first · picked: harvested
+  for (let d = 480; d < JOURNEY_LENGTH - 400; d += 360 + Math.random() * 260) {
+    plants.push({
+      worldX: d,
+      ripe: true,
+      picked: false,
+      eaten: false,
+      pop: 0,        // little grow-in bounce
+      threatened: 0  // a bunny is heading for this one
+    });
+  }
+  // Clouds (parallax)
+  for (let i = 0; i < 6; i++) {
+    clouds.push({ x: Math.random() * W, y: 40 + Math.random() * (H * 0.32), s: 0.3 + Math.random() * 0.4, scale: 0.7 + Math.random() });
+  }
+}
+
+// ---- Input ----
+const keymap = { ArrowLeft: "left", ArrowRight: "right" };
+addEventListener("keydown", (e) => {
+  if (keymap[e.key]) keys[keymap[e.key]] = true;
+  if ((e.key === "ArrowUp" || e.key === " ") && state === "playing") pickNow = true;
+  if ([" ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
+});
+addEventListener("keyup", (e) => { if (keymap[e.key]) keys[keymap[e.key]] = false; });
+
+// Touch controls: left third = left, right third = right, middle = pick
+function touchHandler(e) {
+  if (state !== "playing") return;
+  for (const t of e.touches) {
+    const x = t.clientX;
+    if (x < W / 3) { keys.left = true; keys.right = false; }
+    else if (x > (2 * W) / 3) { keys.right = true; keys.left = false; }
+    else pickNow = true;
+  }
+  e.preventDefault();
+}
+canvas.addEventListener("touchstart", touchHandler, { passive: false });
+canvas.addEventListener("touchmove", touchHandler, { passive: false });
+canvas.addEventListener("touchend", (e) => { if (e.touches.length === 0) { keys.left = keys.right = false; } });
+
+// ---- Update ----
+const SPEED = 4.2;
+const PICK_REACH = 64;     // how close Ben must be to pick a plant
+const BUNNY_SPEED = 1.6;
+
+function nearestPlant() {
+  let best = null, bestDist = PICK_REACH;
+  for (const p of plants) {
+    if (!p.ripe || p.picked || p.eaten) continue;
+    const d = Math.abs(p.worldX - kid.worldX);
+    if (d < bestDist) { bestDist = d; best = p; }
+  }
+  return best;
+}
+
+let bunnySpawnCooldown = 90;
+
+function spawnBunny() {
+  // pick a ripe, un-threatened plant ahead of the kid as a target
+  const candidates = plants.filter(p =>
+    p.ripe && !p.picked && !p.eaten && !p.threatened &&
+    p.worldX > kid.worldX - 100 && p.worldX < kid.worldX + W);
+  if (candidates.length === 0) return;
+  const target = candidates[Math.floor(Math.random() * candidates.length)];
+  target.threatened = 1;
+  // approach from whichever side is off-screen-ish
+  const fromLeft = Math.random() < 0.5;
+  bunnies.push({
+    worldX: target.worldX + (fromLeft ? -W * 0.45 : W * 0.45),
+    target,
+    hop: Math.random() * Math.PI * 2,
+    eating: 0,
+    leaving: false,
+    face: fromLeft ? 1 : -1
+  });
+}
+
+function update() {
+  if (state !== "playing") return;
+
+  // Move
+  if (keys.right) { kid.worldX += SPEED; kid.face = 1; kid.walkPhase += 0.25; }
+  if (keys.left)  { kid.worldX = Math.max(0, kid.worldX - SPEED); kid.face = -1; kid.walkPhase += 0.25; }
+  distance = kid.worldX;
+  kid.y = ground;
+
+  // Pick a nearby plant
+  const plant = nearestPlant();
+  if (pickNow && plant) {
+    plant.picked = true;
+    plant.pop = 1;
+    score++;
+    pop(plant.worldX - (kid.worldX - W * 0.25), ground - 40);
+  }
+  pickNow = false;
+
+  // plant pop decay
+  for (const p of plants) if (p.pop > 0) p.pop = Math.max(0, p.pop - 0.05);
+
+  // Spawn bunnies over time (gentle pressure)
+  bunnySpawnCooldown--;
+  if (bunnySpawnCooldown <= 0) {
+    spawnBunny();
+    bunnySpawnCooldown = 120 + Math.random() * 120;
+  }
+
+  // Bunnies hop toward their target broccoli and nibble it
+  for (const b of bunnies) {
+    b.hop += 0.18;
+    if (b.leaving) {
+      b.worldX += b.face * (BUNNY_SPEED + 0.6);
+      continue;
+    }
+    const t = b.target;
+    // target already gone (picked by Ben) -> hop away disappointed
+    if (!t || t.picked || t.eaten) {
+      b.leaving = true;
+      b.face = b.worldX < kid.worldX ? -1 : 1;
+      if (t) t.threatened = 0;
+      continue;
+    }
+    const dx = t.worldX - b.worldX;
+    b.face = dx >= 0 ? 1 : -1;
+    if (Math.abs(dx) > 8) {
+      b.worldX += Math.sign(dx) * BUNNY_SPEED;
+    } else {
+      // arrived: nibble
+      b.eating += 1;
+      if (b.eating > 70) {
+        t.eaten = true;
+        t.threatened = 0;
+        b.leaving = true;
+        b.face = Math.random() < 0.5 ? -1 : 1;
+      }
+    }
+  }
+  // remove bunnies that have hopped off-screen
+  const camForCull = kid.worldX - W * 0.25;
+  bunnies = bunnies.filter(b => {
+    const bx = b.worldX - camForCull;
+    return !(b.leaving && (bx < -120 || bx > W + 120));
+  });
+
+  // Clouds drift
+  for (const c of clouds) {
+    c.x -= c.s;
+    if (c.x < -120) { c.x = W + 60; c.y = 40 + Math.random() * (H * 0.32); }
+  }
+
+  // Reached mom?
+  if (kid.worldX >= JOURNEY_LENGTH) finish();
+}
+
+// little particle pops
+let pops = [];
+function pop(x, y) {
+  for (let i = 0; i < 8; i++) {
+    pops.push({ x, y, vx: (Math.random() - 0.5) * 6, vy: -Math.random() * 5 - 1, life: 1 });
+  }
+}
+
+// ---- Draw ----
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  const camX = kid.worldX - W * 0.25;
+
+  // Clouds
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  for (const c of clouds) cloud(c.x, c.y, c.scale);
+
+  // Ground
+  ctx.fillStyle = "#7cb342";
+  ctx.fillRect(0, ground, W, H - ground);
+  ctx.strokeStyle = "#558b2f";
+  ctx.lineWidth = 3;
+  for (let gx = -(camX % 40); gx < W; gx += 40) {
+    ctx.beginPath();
+    ctx.moveTo(gx, ground + 6);
+    ctx.lineTo(gx + 8, ground - 8);
+    ctx.stroke();
+  }
+  // Soil path
+  ctx.fillStyle = "#a98256";
+  ctx.fillRect(0, ground, W, 14);
+
+  // Garden beds + broccoli plants
+  for (const p of plants) {
+    const px = p.worldX - camX;
+    if (px < -80 || px > W + 80) continue;
+    drawPlant(px, p);
+  }
+
+  // Bunnies (in front of plants, behind Ben)
+  for (const b of bunnies) {
+    const bx = b.worldX - camX;
+    if (bx < -120 || bx > W + 120) continue;
+    drawBunny(bx, b);
+  }
+
+  // Mom's house at the end
+  const houseX = JOURNEY_LENGTH - camX + 40;
+  if (houseX < W + 300) drawHomeAndMom(houseX);
+
+  // Ben
+  drawKid(W * 0.25, kid.y);
+
+  // Pops
+  pops = pops.filter((p) => p.life > 0);
+  for (const p of pops) {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.3; p.life -= 0.04;
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = "#2e7d32";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // "Pick!" tip when standing near a ripe plant
+  const tip = document.getElementById("pickTip");
+  const plant = nearestPlant();
+  if (plant && state === "playing") {
+    const px = plant.worldX - camX;
+    tip.style.left = px + "px";
+    tip.style.top = (ground - 90) + "px";
+    tip.classList.remove("hidden");
+  } else {
+    tip.classList.add("hidden");
+  }
+
+  // HUD
+  document.getElementById("score").textContent = score;
+  document.getElementById("progressFill").style.width =
+    Math.min(100, (distance / JOURNEY_LENGTH) * 100) + "%";
+}
+
+function cloud(x, y, s = 1) {
+  ctx.beginPath();
+  ctx.arc(x, y, 26 * s, 0, Math.PI * 2);
+  ctx.arc(x + 28 * s, y + 6 * s, 22 * s, 0, Math.PI * 2);
+  ctx.arc(x - 26 * s, y + 8 * s, 20 * s, 0, Math.PI * 2);
+  ctx.arc(x + 4 * s, y - 14 * s, 20 * s, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawPlant(x, p) {
+  // raised garden bed mound
+  ctx.fillStyle = "#6d4c34";
+  ctx.beginPath();
+  ctx.ellipse(x, ground + 6, 34, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#5a3d29";
+  ctx.beginPath();
+  ctx.ellipse(x, ground + 4, 26, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (p.picked) {
+    // just a little leftover stalk after harvest
+    ctx.strokeStyle = "#7cb342";
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(x, ground + 2); ctx.lineTo(x, ground - 14); ctx.stroke();
+    return;
+  }
+  if (p.eaten) {
+    // nibbled-down stub
+    ctx.strokeStyle = "#9ccc65";
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(x - 4, ground + 2); ctx.lineTo(x - 2, ground - 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + 4, ground + 2); ctx.lineTo(x + 3, ground - 6); ctx.stroke();
+    return;
+  }
+
+  const bounce = Math.sin(p.pop * Math.PI) * 4;
+  drawBroccoli(x, ground - 14 - bounce, 1, p.threatened > 0);
+}
+
+// A single broccoli: leafy stalk + bumpy green crown
+function drawBroccoli(x, baseY, scale = 1, alarm = false) {
+  ctx.save();
+  ctx.translate(x, baseY);
+  ctx.scale(scale, scale);
+
+  // stalk
+  ctx.fillStyle = "#aed581";
+  ctx.beginPath();
+  ctx.moveTo(-6, 0);
+  ctx.quadraticCurveTo(-4, -16, -5, -26);
+  ctx.lineTo(5, -26);
+  ctx.quadraticCurveTo(4, -16, 6, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // side leaves
+  ctx.fillStyle = "#8bc34a";
+  ctx.beginPath();
+  ctx.ellipse(-9, -14, 7, 4, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(9, -14, 7, 4, 0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // crown: cluster of green bumps
+  const crown = [
+    [0, -40, 16], [-13, -34, 11], [13, -34, 11],
+    [-8, -46, 10], [8, -46, 10], [0, -52, 9]
+  ];
+  ctx.fillStyle = "#43a047";
+  for (const [cx, cy, r] of crown) {
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  }
+  // darker dimples for texture
+  ctx.fillStyle = "#2e7d32";
+  for (const [cx, cy, r] of crown) {
+    ctx.beginPath(); ctx.arc(cx - r * 0.3, cy - r * 0.3, r * 0.35, 0, Math.PI * 2); ctx.fill();
+  }
+  // highlight
+  ctx.fillStyle = "rgba(255,255,255,0.25)";
+  ctx.beginPath(); ctx.arc(-4, -46, 4, 0, Math.PI * 2); ctx.fill();
+
+  // warning bubble when a bunny is on its way
+  if (alarm) {
+    ctx.fillStyle = "#e74c3c";
+    ctx.font = "bold 18px sans-serif";
+    ctx.textAlign = "center";
+    const wob = Math.sin(Date.now() / 120) * 2;
+    ctx.fillText("!", 22, -48 + wob);
+  }
+  ctx.restore();
+}
+
+function drawBunny(x, b) {
+  const hopY = b.leaving || b.eating === 0 ? Math.abs(Math.sin(b.hop)) * 10 : 2;
+  const y = ground - hopY;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(b.face, 1);
+
+  // body
+  ctx.fillStyle = "#eceff1";
+  ctx.beginPath();
+  ctx.ellipse(0, -12, 15, 13, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // head
+  ctx.beginPath();
+  ctx.arc(12, -22, 9, 0, Math.PI * 2);
+  ctx.fill();
+  // ears
+  ctx.fillStyle = "#eceff1";
+  ctx.beginPath(); ctx.ellipse(10, -38, 3.5, 10, -0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(16, -38, 3.5, 10, 0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#f8bbd0";
+  ctx.beginPath(); ctx.ellipse(10, -38, 1.6, 6, -0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(16, -38, 1.6, 6, 0.2, 0, Math.PI * 2); ctx.fill();
+  // tail
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(-14, -10, 5, 0, Math.PI * 2); ctx.fill();
+  // eye + nose
+  ctx.fillStyle = "#37474f";
+  ctx.beginPath(); ctx.arc(15, -23, 1.8, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#f48fb1";
+  ctx.beginPath(); ctx.arc(21, -21, 1.6, 0, Math.PI * 2); ctx.fill();
+  // feet
+  ctx.fillStyle = "#eceff1";
+  ctx.beginPath(); ctx.ellipse(-2, 0, 7, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(8, 0, 7, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+
+  // munch crumbs while eating
+  if (!b.leaving && b.eating > 0 && Math.floor(b.eating / 6) % 2 === 0) {
+    ctx.fillStyle = "#43a047";
+    ctx.beginPath(); ctx.arc(22, -16, 1.8, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawKid(cx, footY) {
+  const moving = (keys.left || keys.right);
+  const bob = moving ? Math.sin(kid.walkPhase) * 3 : 0;
+  const y = footY + bob;
+  ctx.save();
+  ctx.translate(cx, 0);
+  ctx.scale(kid.face, 1);
+
+  // legs (walking)
+  const swing = moving ? Math.sin(kid.walkPhase) * 8 : 0;
+  ctx.strokeStyle = "#34495e";
+  ctx.lineWidth = 7;
+  ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(-6, y - 28); ctx.lineTo(-6 + swing, y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(6, y - 28); ctx.lineTo(6 - swing, y); ctx.stroke();
+
+  // shirt (boy in green overalls)
+  ctx.fillStyle = "#2e7d32";
+  ctx.beginPath();
+  ctx.moveTo(-14, y - 26);
+  ctx.lineTo(14, y - 26);
+  ctx.lineTo(12, y - 58);
+  ctx.lineTo(-12, y - 58);
+  ctx.closePath();
+  ctx.fill();
+  // overall straps
+  ctx.strokeStyle = "#1b5e20";
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-7, y - 58); ctx.lineTo(-5, y - 30); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(7, y - 58); ctx.lineTo(5, y - 30); ctx.stroke();
+
+  // arms
+  ctx.strokeStyle = "#f1c27d";
+  ctx.beginPath(); ctx.moveTo(-12, y - 50); ctx.lineTo(-22, y - 36 + swing / 2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(12, y - 50); ctx.lineTo(22, y - 36 - swing / 2); ctx.stroke();
+
+  // head
+  ctx.fillStyle = "#f1c27d";
+  ctx.beginPath(); ctx.arc(0, y - 74, 16, 0, Math.PI * 2); ctx.fill();
+  // hair (short)
+  ctx.fillStyle = "#5d4037";
+  ctx.beginPath(); ctx.arc(0, y - 80, 16, Math.PI, 0); ctx.fill();
+  ctx.fillRect(-16, y - 80, 32, 5);
+  // face
+  ctx.fillStyle = "#2c3e50";
+  ctx.beginPath(); ctx.arc(6, y - 74, 2.2, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "#c0392b";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(5, y - 70, 5, 0.1, Math.PI - 0.1); ctx.stroke();
+
+  // a little basket of broccoli that grows with score
+  if (score > 0) {
+    ctx.fillStyle = "#8d6e63";
+    roundRect(13, y - 36, 18, 13, 3); ctx.fill();
+    ctx.fillStyle = "#5d4037";
+    roundRect(13, y - 36, 18, 4, 2); ctx.fill();
+    const n = Math.min(score, 6);
+    for (let i = 0; i < n; i++) {
+      ctx.fillStyle = "#43a047";
+      ctx.beginPath();
+      ctx.arc(17 + (i % 3) * 5, y - 40 - Math.floor(i / 3) * 4, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawHomeAndMom(x) {
+  // house
+  ctx.fillStyle = "#f5deb3";
+  ctx.fillRect(x, ground - 130, 160, 130);
+  ctx.fillStyle = "#2e7d32"; // roof
+  ctx.beginPath();
+  ctx.moveTo(x - 14, ground - 130);
+  ctx.lineTo(x + 80, ground - 200);
+  ctx.lineTo(x + 174, ground - 130);
+  ctx.closePath(); ctx.fill();
+  // door
+  ctx.fillStyle = "#8d6e63";
+  ctx.fillRect(x + 110, ground - 70, 36, 70);
+  // window
+  ctx.fillStyle = "#aed6f1";
+  ctx.fillRect(x + 24, ground - 100, 40, 40);
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
+  ctx.strokeRect(x + 24, ground - 100, 40, 40);
+
+  // Mom standing by the door, waving
+  const mx = x + 80, my = ground;
+  ctx.strokeStyle = "#6a1b9a"; ctx.lineWidth = 7; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(mx - 5, my - 30); ctx.lineTo(mx - 5, my); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(mx + 5, my - 30); ctx.lineTo(mx + 5, my); ctx.stroke();
+  // dress
+  ctx.fillStyle = "#8e24aa";
+  ctx.beginPath();
+  ctx.moveTo(mx - 16, my - 30);
+  ctx.lineTo(mx + 16, my - 30);
+  ctx.lineTo(mx + 10, my - 70);
+  ctx.lineTo(mx - 10, my - 70);
+  ctx.closePath(); ctx.fill();
+  // waving arm
+  const wave = Math.sin(Date.now() / 200) * 0.4;
+  ctx.strokeStyle = "#f1c27d";
+  ctx.save();
+  ctx.translate(mx + 8, my - 64);
+  ctx.rotate(-0.8 + wave);
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(20, 0); ctx.stroke();
+  ctx.restore();
+  ctx.beginPath(); ctx.moveTo(mx - 8, my - 64); ctx.lineTo(mx - 22, my - 48); ctx.stroke();
+  // head + hair
+  ctx.fillStyle = "#f1c27d";
+  ctx.beginPath(); ctx.arc(mx, my - 84, 14, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#4e342e";
+  ctx.beginPath(); ctx.arc(mx, my - 88, 15, Math.PI, 0); ctx.fill();
+  ctx.fillRect(mx - 15, my - 88, 5, 18);
+  ctx.fillRect(mx + 10, my - 88, 5, 18);
+  // smile
+  ctx.strokeStyle = "#c0392b"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(mx, my - 82, 5, 0.1, Math.PI - 0.1); ctx.stroke();
+
+  // heart
+  const hb = 1 + Math.sin(Date.now() / 300) * 0.1;
+  heart(mx, my - 115, 10 * hb);
+}
+
+function heart(x, y, s) {
+  ctx.fillStyle = "#43a047";
+  ctx.beginPath();
+  ctx.moveTo(x, y + s * 0.8);
+  ctx.bezierCurveTo(x + s, y - s * 0.4, x + s * 0.6, y - s, x, y - s * 0.3);
+  ctx.bezierCurveTo(x - s * 0.6, y - s, x - s, y - s * 0.4, x, y + s * 0.8);
+  ctx.fill();
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// ---- Loop ----
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ---- Screens ----
+const startScreen = document.getElementById("startScreen");
+const endScreen = document.getElementById("endScreen");
+
+function finish() {
+  state = "done";
+  keys.left = keys.right = false;
+  document.getElementById("pickTip").classList.add("hidden");
+  const possible = plants.length;
+  const eaten = plants.filter(p => p.eaten).length;
+  document.getElementById("endTitle").textContent = "Ben gives Mom the broccoli! 💚";
+  let stars = "⭐⭐⭐";
+  if (score < possible * 0.4) stars = "⭐";
+  else if (score < possible * 0.75) stars = "⭐⭐";
+  let bunnyNote = eaten > 0
+    ? `The bunnies snuck off with <b>${eaten}</b>. 🐰<br>`
+    : `Not one bunny got a single bite! 🐰<br>`;
+  document.getElementById("endMsg").innerHTML =
+    `He harvested <b>${score}</b> broccoli${score === 1 ? "" : "s"}.<br>` +
+    bunnyNote +
+    `"So healthy! Thank you, my love," says Mom. 🤗<br><br>${stars}`;
+  endScreen.classList.remove("hidden");
+}
+
+document.getElementById("startBtn").addEventListener("click", () => {
+  startScreen.classList.add("hidden");
+  reset();
+});
+document.getElementById("againBtn").addEventListener("click", () => {
+  endScreen.classList.add("hidden");
+  reset();
+});
+
+// init in idle state so something renders behind start screen
+reset();
+state = "idle";
+loop();
+</script>
+</body>
+</html>
