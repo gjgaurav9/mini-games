@@ -137,7 +137,9 @@
   </div>
 </div>
 
+<script src="../shared/banter.js"></script>
 <script>
+let playerName = "Player";
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
@@ -277,6 +279,7 @@ function update() {
     if (Math.abs(dx) < CATCH_RADIUS_X && Math.abs(dy) < 60) {
       b.collected = true;
       score++;
+      if (score % 5 === 0) Banter.say("great", playerName);
       pop(bx, b.y);
     }
   }
@@ -630,12 +633,17 @@ function finish() {
   document.getElementById("endMsg").innerHTML =
     `She brought home <b>${score}</b> banana${score === 1 ? "" : "s"}.<br>` +
     `"Yummy! Thank you, my love," says Mom. 🤗<br><br>${stars}`;
+  Banter.say(score >= possible * 0.75 ? "win" : "good", playerName);
   endScreen.classList.remove("hidden");
 }
 
 document.getElementById("startBtn").addEventListener("click", () => {
-  startScreen.classList.add("hidden");
-  reset();
+  Banter.askNames({ title: "What's your name? 🍌", slots: [{ label: "Player", color: "#f5b301" }] }, (names) => {
+    playerName = names[0];
+    startScreen.classList.add("hidden");
+    reset();
+    Banter.say("start", playerName);
+  });
 });
 document.getElementById("againBtn").addEventListener("click", () => {
   endScreen.classList.add("hidden");

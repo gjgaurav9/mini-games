@@ -147,6 +147,7 @@
   </div>
 </div>
 
+<script src="../shared/banter.js"></script>
 <script>
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
@@ -250,8 +251,9 @@ function placeStriker() {
   striker = { x: s.axis === "h" ? v : s.fixed, y: s.axis === "h" ? s.fixed : v, vx: 0, vy: 0, r: strikerR, type: "striker", active: true };
 }
 
-function newGame(count) {
+function newGame(count, names) {
   if (count) setupPlayers(count);
+  if (names) players.forEach((p, i) => { if (names[i]) p.name = names[i]; });
   computeLayout();
   makeRack();
   turnIndex = 0;
@@ -454,6 +456,12 @@ function resolveShot() {
   const whiteLeft = pieces.filter(p => p.active && p.color === "white").length;
   const blackLeft = pieces.filter(p => p.active && p.color === "black").length;
   if (whiteLeft === 0 || blackLeft === 0) { return win(whiteLeft === 0 ? 0 : 1); }
+
+  // commentary
+  if (queenOwner === a.team && shotPots.queen) Banter.say("great", a.name);
+  else if (own >= 2) Banter.say("great", a.name);
+  else if (own > 0) Banter.say("good", a.name);
+  else if (strikerFoul) Banter.say("unlucky", a.name);
 
   if (!goAgain) {
     // failing your turn while owing the queen sends it back
@@ -669,11 +677,23 @@ function win(team) {
   if (queenOwner === team) msg += "<br>…and bagged the Queen 👑!";
   else if (queenOwner !== null) msg += "<br>(The Queen went to " + teamName(queenOwner) + ".)";
   document.getElementById("endMsg").innerHTML = msg;
+  Banter.say("win", playerCount === 2 ? players.find(p => p.team === team).name : teamName(team));
   endScreen.classList.remove("hidden");
 }
 
-document.getElementById("play2").addEventListener("click", () => { startScreen.classList.add("hidden"); newGame(2); });
-document.getElementById("play4").addEventListener("click", () => { startScreen.classList.add("hidden"); newGame(4); });
+function startCarrom(count) {
+  const w = "#f3e7c9", b = "#3b2f2a";
+  const slots = count === 2
+    ? [{ label: "White", color: w }, { label: "Black", color: b }]
+    : [{ label: "P1 · White", color: w }, { label: "P2 · Black", color: b }, { label: "P3 · White", color: w }, { label: "P4 · Black", color: b }];
+  Banter.askNames({ title: "Carrom — who's playing?", slots }, (names) => {
+    startScreen.classList.add("hidden");
+    newGame(count, names);
+    Banter.say("start", players[0].name);
+  });
+}
+document.getElementById("play2").addEventListener("click", () => startCarrom(2));
+document.getElementById("play4").addEventListener("click", () => startCarrom(4));
 document.getElementById("againBtn").addEventListener("click", () => { endScreen.classList.add("hidden"); startScreen.classList.remove("hidden"); document.getElementById("hud").classList.add("hidden"); state = "idle"; });
 document.getElementById("resetBtn").addEventListener("click", () => { if (state === "moving") return; endScreen.classList.add("hidden"); startScreen.classList.remove("hidden"); document.getElementById("hud").classList.add("hidden"); state = "idle"; });
 

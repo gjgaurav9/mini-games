@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>♟️ Checkers — Pass & Play</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%; font-family: "Comic Sans MS", "Trebuchet MS", sans-serif;
+    overflow: hidden; background: #20140c; user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  #game { position: relative; width: 100vw; height: 100vh;
+    background: radial-gradient(circle at 50% 30%, #3a2517 0%, #160d07 100%); overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; background: rgba(0,0,0,0.6); color: #fff; padding: 24px; z-index: 10; }
+  .overlay h1 { font-size: clamp(30px, 7vw, 58px); text-shadow: 3px 3px 0 #c0392b; }
+  .overlay p { font-size: clamp(15px, 3vw, 22px); margin: 10px 0; max-width: 580px; }
+  .btn { margin-top: 12px; padding: 14px 32px; font-size: clamp(18px, 4vw, 26px); font-family: inherit;
+    border: none; border-radius: 50px; background: #c0392b; color: #fff; cursor: pointer;
+    box-shadow: 0 6px 0 #7d241a; transition: transform .05s; }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #7d241a; }
+  .hidden { display: none !important; }
+  #topbar { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 5; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pill { background: rgba(255,255,255,0.94); padding: 7px 14px; border-radius: 16px; font-size: clamp(13px, 3.2vw, 20px);
+    color: #2c3e50; box-shadow: 0 3px 8px rgba(0,0,0,0.3); white-space: nowrap; font-weight: bold; }
+  #resetBtn { margin-left: auto; background: rgba(255,255,255,0.94); border: none; font-family: inherit; padding: 7px 14px;
+    border-radius: 16px; font-size: clamp(13px, 3.2vw, 18px); color: #2c3e50; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,0.3); }
+  .hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 5; color: #ecdcc8;
+    background: rgba(0,0,0,0.4); padding: 6px 16px; border-radius: 14px; font-size: clamp(12px, 3vw, 16px); text-align: center; max-width: 92vw; }
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="canvas"></canvas>
+  <div id="topbar" class="hidden">
+    <div class="pill" id="turnPill">Turn</div>
+    <div class="pill" id="capPill">Captures 0–0</div>
+    <button id="resetBtn">↺ New</button>
+  </div>
+  <div class="hint">Tap a piece to see its moves, tap a glowing square to move • captures are forced • reach the far row to crown a King</div>
+
+  <div id="startScreen" class="overlay">
+    <h1>♟️ Checkers</h1>
+    <p>Two players, one board. Move diagonally, jump to capture (captures are
+       compulsory!), chain multi-jumps, and crown a <b>King</b> at the far side.
+       Take all your rival's pieces — or leave them with no move — to win.</p>
+    <button class="btn" id="startBtn">Start</button>
+  </div>
+
+  <div id="endScreen" class="overlay hidden">
+    <h1 id="endTitle">🏆</h1>
+    <p id="endMsg"></p>
+    <button class="btn" id="againBtn">Play Again</button>
+  </div>
+</div>
+
+<script src="../shared/banter.js"></script>
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+const N = 8;
+// player 1 = bottom (moves up, r decreasing), player 2 = top (moves down)
+const PDEF = {
+  1: { fill: "#e74c3c", dark: "#a93226", hi: "#ff8a7a", name: "Red", dir: -1, kingRow: 0 },
+  2: { fill: "#ecf0f1", dark: "#95a5a6", hi: "#ffffff", name: "White", dir: 1, kingRow: 7 },
+};
+
+let board, turn, state, selected, legal, mustPiece, lastMove;
+// board[r][c] = null | { player, king }
+
+let W, H, BSZ, OX, OY, cell;
+function computeLayout() {
+  W = canvas.clientWidth; H = canvas.clientHeight;
+  BSZ = Math.min(W * 0.94, H * 0.82);
+  cell = BSZ / N;
+  OX = (W - BSZ) / 2; OY = (H - BSZ) / 2 + H * 0.02;
+}
+function sq(c, r) { return { x: OX + (c + 0.5) * cell, y: OY + (r + 0.5) * cell }; }
+
+function newGame() {
+  computeLayout();
+  board = Array.from({ length: N }, () => Array(N).fill(null));
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    if ((r + c) % 2 === 1) {
+      if (r < 3) board[r][c] = { player: 2, king: false };
+      else if (r > 4) board[r][c] = { player: 1, king: false };
+    }
+  }
+  turn = 1; state = "playing"; selected = null; legal = []; mustPiece = null; lastMove = null;
+  document.getElementById("topbar").classList.remove("hidden");
+  endScreen.classList.add("hidden");
+  updateHUD();
+}
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = canvas.clientWidth * DPR; canvas.height = canvas.clientHeight * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  computeLayout();
+}
+window.addEventListener("resize", resize);
+
+const inB = (r, c) => r >= 0 && r < N && c >= 0 && c < N;
+function dirsFor(piece) {
+  if (piece.king) return [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+  return PDEF[piece.player].dir === -1 ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
+}
+
+// captures available from (r,c)
+function pieceCaptures(r, c) {
+  const pc = board[r][c]; if (!pc) return [];
+  const out = [];
+  for (const [dr, dc] of dirsFor(pc)) {
+    const mr = r + dr, mc = c + dc, tr = r + 2 * dr, tc = c + 2 * dc;
+    if (inB(tr, tc) && board[tr][tc] === null && board[mr] && board[mr][mc] && board[mr][mc].player !== pc.player) {
+      out.push({ fromR: r, fromC: c, toR: tr, toC: tc, cap: { r: mr, c: mc } });
+    }
+  }
+  return out;
+}
+function pieceSimple(r, c) {
+  const pc = board[r][c]; if (!pc) return [];
+  const out = [];
+  for (const [dr, dc] of dirsFor(pc)) {
+    const tr = r + dr, tc = c + dc;
+    if (inB(tr, tc) && board[tr][tc] === null) out.push({ fromR: r, fromC: c, toR: tr, toC: tc, cap: null });
+  }
+  return out;
+}
+function allCaptures(player) {
+  const out = [];
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++)
+    if (board[r][c] && board[r][c].player === player) out.push(...pieceCaptures(r, c));
+  return out;
+}
+function allMoves(player) {
+  const caps = allCaptures(player);
+  if (caps.length) return caps;          // captures are mandatory
+  const out = [];
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++)
+    if (board[r][c] && board[r][c].player === player) out.push(...pieceSimple(r, c));
+  return out;
+}
+
+function movesForSelected() {
+  if (!selected) return [];
+  if (mustPiece) return pieceCaptures(mustPiece.r, mustPiece.c);
+  const caps = allCaptures(turn);
+  if (caps.length) return caps.filter((m) => m.fromR === selected.r && m.fromC === selected.c);
+  return pieceSimple(selected.r, selected.c);
+}
+
+let anim = null; // {fromXY,toXY,t,dur,piece}
+canvas.addEventListener("pointerdown", (e) => {
+  if (state !== "playing" || anim) return;
+  const rect = canvas.getBoundingClientRect();
+  const c = Math.floor((e.clientX - rect.left - OX) / cell);
+  const r = Math.floor((e.clientY - rect.top - OY) / cell);
+  if (!inB(r, c)) return;
+
+  // tapping a legal destination?
+  const move = legal.find((m) => m.toR === r && m.toC === c);
+  if (selected && move) { doMove(move); return; }
+
+  // otherwise (re)select one of your pieces — but if mid multi-jump you can't switch
+  if (!mustPiece && board[r][c] && board[r][c].player === turn) {
+    const myMoves = allMoves(turn).filter((m) => m.fromR === r && m.fromC === c);
+    if (myMoves.length) { selected = { r, c }; legal = myMoves; }
+    else { selected = null; legal = []; }
+  }
+});
+
+function doMove(move) {
+  const piece = board[move.fromR][move.fromC];
+  board[move.fromR][move.fromC] = null;
+  const from = sq(move.fromC, move.fromR), to = sq(move.toC, move.toR);
+  anim = { fromXY: from, toXY: to, t: 0, dur: 10, piece, move };
+}
+
+function finishMove(move, piece) {
+  const wasCapture = !!move.cap;
+  if (wasCapture) board[move.cap.r][move.cap.c] = null;
+  board[move.toR][move.toC] = piece;
+  lastMove = { toR: move.toR, toC: move.toC };
+
+  // promotion
+  let promoted = false;
+  if (!piece.king && move.toR === PDEF[piece.player].kingRow) { piece.king = true; promoted = true; }
+
+  const pname = PDEF[piece.player].name;
+  if (promoted) Banter.say("great", pname);
+
+  // multi-jump continuation (only if it was a capture, not just promoted)
+  if (wasCapture && !promoted) {
+    const more = pieceCaptures(move.toR, move.toC);
+    if (more.length) {
+      mustPiece = { r: move.toR, c: move.toC };
+      selected = { r: move.toR, c: move.toC };
+      legal = more;
+      Banter.say("combo", pname);
+      updateHUD();
+      return; // same player continues
+    }
+    Banter.say("capture", pname);
+  }
+  // turn over
+  mustPiece = null; selected = null; legal = [];
+  turn = turn === 1 ? 2 : 1;
+  // win check: opponent has no moves
+  if (allMoves(turn).length === 0) return win(turn === 1 ? 2 : 1);
+  updateHUD();
+}
+
+function countPieces(player) { let n = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (board[r][c] && board[r][c].player === player) n++; return n; }
+
+function update() {
+  if (anim) {
+    anim.t++;
+    if (anim.t >= anim.dur) { const m = anim.move, p = anim.piece; anim = null; finishMove(m, p); }
+  }
+}
+
+function rr(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function drawPiece(x, y, piece, r) {
+  const d = PDEF[piece.player];
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.beginPath(); ctx.ellipse(x, y + r * 0.32, r * 0.92, r * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+  // stacked rings for a checker look
+  for (const off of [r * 0.18, 0]) {
+    const g = ctx.createRadialGradient(x - r * 0.3, y - off - r * 0.3, r * 0.2, x, y - off, r);
+    g.addColorStop(0, d.hi); g.addColorStop(0.55, d.fill); g.addColorStop(1, d.dark);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - off, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = d.dark; ctx.lineWidth = Math.max(1.5, r * 0.08); ctx.beginPath(); ctx.arc(x, y - off, r, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = Math.max(1, r * 0.06);
+  ctx.beginPath(); ctx.arc(x, y - r * 0.18, r * 0.62, 0, Math.PI * 2); ctx.stroke();
+  if (piece.king) {
+    ctx.fillStyle = "#ffd700"; ctx.font = `${r * 1.1}px serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("♛", x, y - r * 0.18 + r * 0.05);
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  if (!board) return;
+  // frame
+  ctx.fillStyle = "#3e2419"; rr(OX - cell * 0.18, OY - cell * 0.18, BSZ + cell * 0.36, BSZ + cell * 0.36, cell * 0.12); ctx.fill();
+  // squares
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    ctx.fillStyle = (r + c) % 2 === 0 ? "#f0d9b5" : "#9c6b3f";
+    ctx.fillRect(OX + c * cell, OY + r * cell, cell, cell);
+  }
+  // last move highlight
+  if (lastMove) { ctx.fillStyle = "rgba(241,196,15,0.35)"; ctx.fillRect(OX + lastMove.toC * cell, OY + lastMove.toR * cell, cell, cell); }
+  // selected square
+  if (selected) { ctx.fillStyle = "rgba(46,204,113,0.4)"; ctx.fillRect(OX + selected.c * cell, OY + selected.r * cell, cell, cell); }
+  // legal destinations
+  const t = (Math.sin(Date.now() / 250) + 1) / 2;
+  for (const m of legal) {
+    const s = sq(m.toC, m.toR);
+    ctx.fillStyle = m.cap ? `rgba(231,76,60,${0.45 + t * 0.4})` : `rgba(46,204,113,${0.4 + t * 0.4})`;
+    ctx.beginPath(); ctx.arc(s.x, s.y, cell * 0.16, 0, Math.PI * 2); ctx.fill();
+  }
+  // pieces
+  const r = cell * 0.36;
+  for (let rr2 = 0; rr2 < N; rr2++) for (let c = 0; c < N; c++) {
+    const pc = board[rr2][c];
+    if (pc && !(anim && anim.move.toR === rr2 && anim.move.toC === c)) { const s = sq(c, rr2); drawPiece(s.x, s.y, pc, r); }
+  }
+  // animating piece
+  if (anim) {
+    const k = Math.min(1, anim.t / anim.dur);
+    const x = anim.fromXY.x + (anim.toXY.x - anim.fromXY.x) * k;
+    const y = anim.fromXY.y + (anim.toXY.y - anim.fromXY.y) * k - Math.sin(k * Math.PI) * cell * 0.25;
+    drawPiece(x, y, anim.piece, r);
+  }
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+const startScreen = document.getElementById("startScreen");
+const endScreen = document.getElementById("endScreen");
+function updateHUD() {
+  const tp = document.getElementById("turnPill");
+  tp.textContent = "▸ " + PDEF[turn].name + (mustPiece ? " — jump again!" : "'s turn");
+  tp.style.background = PDEF[turn].fill; tp.style.color = turn === 1 ? "#fff" : "#2c3e50";
+  document.getElementById("capPill").textContent = "Pieces  🔴 " + countPieces(1) + " – ⚪ " + countPieces(2);
+}
+function win(player) {
+  state = "won";
+  document.getElementById("endTitle").textContent = "🏆 " + PDEF[player].name + " wins!";
+  document.getElementById("endMsg").innerHTML = PDEF[player].name + " cleared the board (or trapped the rival). 🎉";
+  Banter.say("win", PDEF[player].name);
+  endScreen.classList.remove("hidden");
+}
+
+function backToStart() {
+  endScreen.classList.add("hidden"); startScreen.classList.remove("hidden");
+  document.getElementById("topbar").classList.add("hidden"); board = null; state = "idle";
+}
+document.getElementById("startBtn").addEventListener("click", () => {
+  const slots = [{ label: "Red", color: PDEF[1].fill }, { label: "White", color: PDEF[2].fill }];
+  Banter.askNames({ title: "Checkers — players?", slots }, (names) => {
+    PDEF[1].name = names[0]; PDEF[2].name = names[1];
+    startScreen.classList.add("hidden"); newGame(); Banter.say("start", PDEF[1].name);
+  });
+});
+document.getElementById("againBtn").addEventListener("click", backToStart);
+document.getElementById("resetBtn").addEventListener("click", () => { if (anim) return; backToStart(); });
+
+resize();
+state = "idle";
+loop();
+</script>
+</body>
+</html>

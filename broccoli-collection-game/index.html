@@ -138,7 +138,9 @@
   </div>
 </div>
 
+<script src="../shared/banter.js"></script>
 <script>
+let playerName = "Player";
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
@@ -265,6 +267,7 @@ function update() {
     plant.picked = true;
     plant.pop = 1;
     score++;
+    if (score % 5 === 0) Banter.say("great", playerName);
     pop(plant.worldX - (kid.worldX - W * 0.25), ground - 40);
   }
   pickNow = false;
@@ -718,12 +721,17 @@ function finish() {
     `He harvested <b>${score}</b> broccoli${score === 1 ? "" : "s"}.<br>` +
     bunnyNote +
     `"So healthy! Thank you, my love," says Mom. 🤗<br><br>${stars}`;
+  Banter.say(score >= possible * 0.75 ? "win" : "good", playerName);
   endScreen.classList.remove("hidden");
 }
 
 document.getElementById("startBtn").addEventListener("click", () => {
-  startScreen.classList.add("hidden");
-  reset();
+  Banter.askNames({ title: "What's your name? 🥦", slots: [{ label: "Player", color: "#66bb6a" }] }, (names) => {
+    playerName = names[0];
+    startScreen.classList.add("hidden");
+    reset();
+    Banter.say("start", playerName);
+  });
 });
 document.getElementById("againBtn").addEventListener("click", () => {
   endScreen.classList.add("hidden");

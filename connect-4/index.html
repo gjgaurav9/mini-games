@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🔴 Connect 4 — Pass & Play</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%; font-family: "Comic Sans MS", "Trebuchet MS", sans-serif;
+    overflow: hidden; background: #16233a; user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  #game { position: relative; width: 100vw; height: 100vh;
+    background: radial-gradient(circle at 50% 30%, #24365c 0%, #101727 100%); overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; background: rgba(0,0,0,0.6); color: #fff; padding: 24px; z-index: 10; }
+  .overlay h1 { font-size: clamp(30px, 7vw, 60px); text-shadow: 3px 3px 0 #f1c40f; }
+  .overlay p { font-size: clamp(15px, 3vw, 22px); margin: 10px 0; max-width: 580px; }
+  .btn { margin-top: 12px; padding: 14px 32px; font-size: clamp(18px, 4vw, 26px); font-family: inherit;
+    border: none; border-radius: 50px; background: #f1c40f; color: #5a4500; cursor: pointer;
+    box-shadow: 0 6px 0 #b8860b; transition: transform .05s; }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #b8860b; }
+  .hidden { display: none !important; }
+  #topbar { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 5; display: flex; gap: 8px; align-items: center; }
+  .pill { background: rgba(255,255,255,0.92); padding: 7px 14px; border-radius: 16px; font-size: clamp(13px, 3.2vw, 20px);
+    color: #2c3e50; box-shadow: 0 3px 8px rgba(0,0,0,0.3); white-space: nowrap; font-weight: bold; }
+  #resetBtn { margin-left: auto; background: rgba(255,255,255,0.92); border: none; font-family: inherit; padding: 7px 14px;
+    border-radius: 16px; font-size: clamp(13px, 3.2vw, 18px); color: #2c3e50; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,0.3); }
+  .hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 5; color: #ecf0f1;
+    background: rgba(0,0,0,0.35); padding: 6px 16px; border-radius: 14px; font-size: clamp(12px, 3vw, 17px); }
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="canvas"></canvas>
+  <div id="topbar" class="hidden">
+    <div class="pill" id="turnPill">Turn</div>
+    <button id="resetBtn">↺ New</button>
+  </div>
+  <div class="hint" id="hint">Tap a column to drop your disc • connect four in a row to win</div>
+
+  <div id="startScreen" class="overlay">
+    <h1>🔴 Connect 4 🟡</h1>
+    <p>Two players, one phone. Take turns dropping discs into the columns —
+       first to line up <b>four in a row</b> (across, down, or diagonally) wins!</p>
+    <button class="btn" id="startBtn">Start</button>
+  </div>
+
+  <div id="endScreen" class="overlay hidden">
+    <h1 id="endTitle">🎉</h1>
+    <p id="endMsg"></p>
+    <button class="btn" id="againBtn">Play Again</button>
+  </div>
+</div>
+
+<script src="../shared/banter.js"></script>
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+const COLS = 7, ROWS = 6;
+const P = [null,
+  { fill: "#e74c3c", dark: "#a93226", name: "Red" },
+  { fill: "#f1c40f", dark: "#b8860b", name: "Yellow" }];
+
+let W, H, BW, BH, OX, OY, cell;
+function computeLayout() {
+  W = canvas.clientWidth; H = canvas.clientHeight;
+  const maxW = W * 0.94, maxH = H * 0.8;
+  cell = Math.min(maxW / COLS, maxH / ROWS);
+  BW = cell * COLS; BH = cell * ROWS;
+  OX = (W - BW) / 2; OY = (H - BH) / 2 + H * 0.02;
+}
+function slotCenter(col, row) { return { x: OX + (col + 0.5) * cell, y: OY + (row + 0.5) * cell }; }
+
+let grid, turn, state, winLine, drop, hoverCol;
+function newGame() {
+  computeLayout();
+  grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+  turn = 1; state = "playing"; winLine = null; drop = null; hoverCol = 3;
+  document.getElementById("topbar").classList.remove("hidden");
+  endScreen.classList.add("hidden");
+  updateHUD();
+}
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = canvas.clientWidth * DPR; canvas.height = canvas.clientHeight * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  computeLayout();
+}
+window.addEventListener("resize", resize);
+
+function colFromX(x) { return Math.floor((x - OX) / cell); }
+function lowestEmpty(col) { for (let r = ROWS - 1; r >= 0; r--) if (grid[r][col] === 0) return r; return -1; }
+
+canvas.addEventListener("pointermove", (e) => {
+  if (state !== "playing") return;
+  const rect = canvas.getBoundingClientRect();
+  hoverCol = Math.max(0, Math.min(COLS - 1, colFromX(e.clientX - rect.left)));
+});
+canvas.addEventListener("pointerdown", (e) => {
+  if (state !== "playing") return;
+  const rect = canvas.getBoundingClientRect();
+  const col = colFromX(e.clientX - rect.left);
+  if (col < 0 || col >= COLS) return;
+  const row = lowestEmpty(col);
+  if (row < 0) return;
+  hoverCol = col;
+  // start a falling disc
+  drop = { col, row, y: OY - cell * 0.5, vy: 0, player: turn };
+  state = "dropping";
+});
+
+function maxRunAt(r, c, player) {
+  const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]]; let best = 1;
+  for (const [dr, dc] of dirs) {
+    let cnt = 1;
+    for (const s of [1, -1]) {
+      let rr = r + dr * s, cc = c + dc * s;
+      while (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && grid[rr][cc] === player) { cnt++; rr += dr * s; cc += dc * s; }
+    }
+    best = Math.max(best, cnt);
+  }
+  return best;
+}
+function checkWin(r, c, player) {
+  const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+  for (const [dr, dc] of dirs) {
+    const line = [[r, c]];
+    for (const s of [1, -1]) {
+      let rr = r + dr * s, cc = c + dc * s;
+      while (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && grid[rr][cc] === player) {
+        line.push([rr, cc]); rr += dr * s; cc += dc * s;
+      }
+    }
+    if (line.length >= 4) return line;
+  }
+  return null;
+}
+
+function settleDrop() {
+  const { col, row, player } = drop;
+  grid[row][col] = player;
+  drop = null;
+  const line = checkWin(row, col, player);
+  if (line) { winLine = line; return win(player); }
+  if (grid[0].every((v) => v !== 0)) return tie();
+  if (maxRunAt(row, col, player) >= 3) Banter.say("great", P[player].name);
+  turn = turn === 1 ? 2 : 1;
+  state = "playing";
+  updateHUD();
+}
+
+function update() {
+  if (state === "dropping" && drop) {
+    drop.vy += cell * 0.045;
+    drop.y += drop.vy;
+    const target = slotCenter(drop.col, drop.row).y;
+    if (drop.y >= target) {
+      // little bounce
+      if (drop.vy > cell * 0.12) { drop.y = target; drop.vy *= -0.28; }
+      else { drop.y = target; settleDrop(); }
+    }
+  }
+}
+
+function rr(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function drawDisc(x, y, player, r) {
+  const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.35, r * 0.2, x, y, r);
+  g.addColorStop(0, "#fff"); g.addColorStop(0.28, P[player].fill); g.addColorStop(1, P[player].dark);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.2)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  if (!grid) { return; }
+  const r = cell * 0.4;
+
+  // hover/preview disc above the board
+  if (state === "playing" && lowestEmpty(hoverCol) >= 0) {
+    const x = slotCenter(hoverCol, 0).x;
+    ctx.globalAlpha = 0.5; drawDisc(x, OY - cell * 0.5, turn, r); ctx.globalAlpha = 1;
+    ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+    ctx.strokeRect(OX + hoverCol * cell + 2, OY, cell - 4, BH); ctx.setLineDash([]);
+  }
+
+  // falling disc (behind the board mask so it appears to drop into holes)
+  if (drop) { const x = slotCenter(drop.col, 0).x; drawDisc(x, drop.y, drop.player, r); }
+
+  // board with punched holes
+  ctx.save();
+  ctx.fillStyle = "#2563c9";
+  rr(OX - cell * 0.06, OY - cell * 0.06, BW + cell * 0.12, BH + cell * 0.12, cell * 0.18); ctx.fill();
+  // cut holes
+  ctx.globalCompositeOperation = "destination-out";
+  for (let rr2 = 0; rr2 < ROWS; rr2++) for (let c = 0; c < COLS; c++) {
+    const s = slotCenter(c, rr2); ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalCompositeOperation = "source-over";
+  ctx.restore();
+
+  // placed discs (drawn through the holes)
+  for (let rr2 = 0; rr2 < ROWS; rr2++) for (let c = 0; c < COLS; c++) {
+    if (grid[rr2][c]) { const s = slotCenter(c, rr2); drawDisc(s.x, s.y, grid[rr2][c], r); }
+  }
+
+  // winning line glow
+  if (winLine) {
+    const t = (Math.sin(Date.now() / 250) + 1) / 2;
+    ctx.strokeStyle = `rgba(255,255,255,${0.5 + t * 0.5})`; ctx.lineWidth = cell * 0.12; ctx.lineCap = "round";
+    // winLine entries are [row,col], built outward from the centre — sort to the true endpoints
+    const sorted = [...winLine].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const first = sorted[0], last = sorted[sorted.length - 1];
+    const s0 = slotCenter(first[1], first[0]), s1 = slotCenter(last[1], last[0]);
+    ctx.beginPath(); ctx.moveTo(s0.x, s0.y); ctx.lineTo(s1.x, s1.y); ctx.stroke();
+  }
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+const startScreen = document.getElementById("startScreen");
+const endScreen = document.getElementById("endScreen");
+function updateHUD() {
+  const tp = document.getElementById("turnPill");
+  tp.textContent = "▸ " + P[turn].name + "'s turn";
+  tp.style.background = P[turn].fill; tp.style.color = turn === 1 ? "#fff" : "#5a4500";
+}
+function win(player) {
+  state = "won";
+  document.getElementById("endTitle").textContent = "🎉 " + P[player].name + " wins!";
+  document.getElementById("endMsg").innerHTML = P[player].name + " connected four! 🏆";
+  Banter.say("win", P[player].name);
+  setTimeout(() => endScreen.classList.remove("hidden"), 900);
+}
+function tie() {
+  state = "won";
+  document.getElementById("endTitle").textContent = "🤝 It's a draw!";
+  document.getElementById("endMsg").innerHTML = "The board is full — nobody connected four. Rematch?";
+  endScreen.classList.remove("hidden");
+}
+
+document.getElementById("startBtn").addEventListener("click", () => {
+  const slots = [{ label: "Red", color: P[1].fill }, { label: "Yellow", color: P[2].fill }];
+  Banter.askNames({ title: "Connect 4 — players?", slots }, (names) => {
+    P[1].name = names[0]; P[2].name = names[1];
+    startScreen.classList.add("hidden"); newGame(); Banter.say("start", P[1].name);
+  });
+});
+document.getElementById("againBtn").addEventListener("click", () => {
+  endScreen.classList.add("hidden"); startScreen.classList.remove("hidden");
+  document.getElementById("topbar").classList.add("hidden"); grid = null; state = "idle";
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  if (state === "dropping") return;
+  endScreen.classList.add("hidden"); startScreen.classList.remove("hidden");
+  document.getElementById("topbar").classList.add("hidden"); grid = null; state = "idle";
+});
+
+resize();
+state = "idle";
+loop();
+</script>
+</body>
+</html>

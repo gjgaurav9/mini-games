@@ -119,6 +119,7 @@
   </div>
 </div>
 
+<script src="../shared/banter.js"></script>
 <script>
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
@@ -164,10 +165,11 @@ let segQueue = [];        // upcoming {to,kind}
 let lastRoll = 0, rolledSix = false;
 let diceAnimUntil = 0, rollMsg = "Tap the dice to roll 🎲";
 
-function newGame(n) {
+function newGame(n, names) {
   computeLayout();
   players = [];
   for (let i = 0; i < n; i++) players.push({ ...COLORS[i], pos: 0, ax: 0, ay: 0, finished: false });
+  if (names) players.forEach((p, i) => { if (names[i]) p.name = names[i]; });
   // place tokens at start (just below cell 1)
   players.forEach((p, i) => { const c = startSpot(i); p.ax = c.x; p.ay = c.y; });
   turnIndex = 0;
@@ -237,6 +239,7 @@ function finishRoll() {
   rolledSix = lastRoll === 6;
   diceEl.classList.remove("disabled");
   const p = players[turnIndex];
+  if (rolledSix) Banter.say("sixer", p.name);
   const target = p.pos + lastRoll;
   segQueue = [];
   if (target <= 100) {
@@ -262,8 +265,8 @@ function startSegment() {
 function finishSegment() {
   const p = players[turnIndex];
   p.pos = anim.toN;
-  if (anim.kind === "snake") rollMsg = p.name + " hit a snake! 🐍 down to " + p.pos;
-  else if (anim.kind === "ladder") rollMsg = p.name + " climbed a ladder! 🪜 up to " + p.pos;
+  if (anim.kind === "snake") { rollMsg = p.name + " hit a snake! 🐍 down to " + p.pos; Banter.say("unlucky", p.name); }
+  else if (anim.kind === "ladder") { rollMsg = p.name + " climbed a ladder! 🪜 up to " + p.pos; Banter.say("great", p.name); }
   anim = null;
   if (p.pos === 100) { p.finished = true; return win(p); }
   if (segQueue.length === 0) endTurn();
@@ -448,6 +451,7 @@ function win(p) {
   state = "won";
   document.getElementById("endTitle").textContent = "🏆 " + p.name + " wins!";
   document.getElementById("endMsg").innerHTML = p.name + " reached 100 first! 🎉";
+  Banter.say("win", p.name);
   endScreen.classList.remove("hidden");
 }
 
@@ -456,7 +460,12 @@ document.querySelectorAll(".pcBtn").forEach((b) => b.addEventListener("click", (
   document.querySelectorAll(".pcBtn").forEach(x => x.classList.remove("sel"));
   b.classList.add("sel"); pendingPlayers = +b.dataset.n;
 }));
-document.getElementById("startBtn").addEventListener("click", () => { startScreen.classList.add("hidden"); newGame(pendingPlayers); });
+document.getElementById("startBtn").addEventListener("click", () => {
+  const slots = COLORS.slice(0, pendingPlayers).map((c) => ({ label: c.name, color: c.fill }));
+  Banter.askNames({ title: "Snakes & Ladders — players?", slots }, (names) => {
+    startScreen.classList.add("hidden"); newGame(pendingPlayers, names); Banter.say("start", players[0].name);
+  });
+});
 document.getElementById("againBtn").addEventListener("click", () => {
   endScreen.classList.add("hidden"); startScreen.classList.remove("hidden");
   document.getElementById("topbar").classList.add("hidden");

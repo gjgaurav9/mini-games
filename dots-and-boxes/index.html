@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>⬛ Dots & Boxes — Pass & Play</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%; font-family: "Comic Sans MS", "Trebuchet MS", sans-serif;
+    overflow: hidden; background: #f4ede0; user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  #game { position: relative; width: 100vw; height: 100vh;
+    background: radial-gradient(circle at 50% 30%, #fdfaf3 0%, #ece3d2 100%); overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; background: rgba(0,0,0,0.55); color: #fff; padding: 24px; z-index: 10; }
+  .overlay h1 { font-size: clamp(28px, 7vw, 56px); text-shadow: 3px 3px 0 #e67e22; }
+  .overlay p { font-size: clamp(15px, 3vw, 22px); margin: 10px 0; max-width: 580px; }
+  .overlay .lbl { font-size: clamp(13px, 3vw, 18px); opacity: .85; margin-top: 12px; }
+  .btn { margin-top: 14px; padding: 14px 32px; font-size: clamp(18px, 4vw, 26px); font-family: inherit;
+    border: none; border-radius: 50px; background: #e67e22; color: #fff; cursor: pointer;
+    box-shadow: 0 6px 0 #b8601a; transition: transform .05s; }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #b8601a; }
+  .btnRow { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+  .opt { min-width: 56px; height: 52px; padding: 0 14px; border-radius: 14px; border: 3px solid transparent;
+    background: rgba(255,255,255,0.16); color: #fff; font-size: 20px; font-family: inherit; cursor: pointer; }
+  .opt.sel { border-color: #f1c40f; background: rgba(241,196,15,0.25); }
+  .hidden { display: none !important; }
+  #topbar { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 5; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .pill { background: rgba(255,255,255,0.95); padding: 6px 12px; border-radius: 16px; font-size: clamp(12px, 3vw, 18px);
+    color: #2c3e50; box-shadow: 0 3px 8px rgba(0,0,0,0.2); white-space: nowrap; font-weight: bold; }
+  #resetBtn { margin-left: auto; background: rgba(255,255,255,0.95); border: none; font-family: inherit; padding: 6px 12px;
+    border-radius: 16px; font-size: clamp(12px, 3vw, 16px); color: #2c3e50; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,0.2); }
+  .hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 5; color: #5d4d35;
+    background: rgba(255,255,255,0.65); padding: 6px 16px; border-radius: 14px; font-size: clamp(12px, 3vw, 16px); }
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="canvas"></canvas>
+  <div id="topbar" class="hidden"></div>
+  <div class="hint">Tap between two dots to draw a line • complete a box to claim it and go again</div>
+
+  <div id="startScreen" class="overlay">
+    <h1>⬛ Dots &amp; Boxes</h1>
+    <p>Take turns drawing one line between two dots. Close the fourth side of a
+       box to claim it (and take another turn). Most boxes when the grid is full wins!</p>
+    <div class="lbl">Players</div>
+    <div class="btnRow" id="pcRow">
+      <button class="opt sel" data-n="2">2</button>
+      <button class="opt" data-n="3">3</button>
+      <button class="opt" data-n="4">4</button>
+    </div>
+    <div class="lbl">Grid</div>
+    <div class="btnRow" id="szRow">
+      <button class="opt sel" data-s="5">Small</button>
+      <button class="opt" data-s="7">Big</button>
+    </div>
+    <button class="btn" id="startBtn">Start</button>
+  </div>
+
+  <div id="endScreen" class="overlay hidden">
+    <h1 id="endTitle">🏆</h1>
+    <p id="endMsg"></p>
+    <button class="btn" id="againBtn">Play Again</button>
+  </div>
+</div>
+
+<script src="../shared/banter.js"></script>
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+const COLORS = [
+  { fill: "#e74c3c", soft: "#f9c9c4", name: "Red" },
+  { fill: "#3498db", soft: "#c6e2f5", name: "Blue" },
+  { fill: "#2ecc71", soft: "#c6f0d8", name: "Green" },
+  { fill: "#e67e22", soft: "#f8ddc2", name: "Orange" },
+];
+
+let D = 5;             // dots per side
+let players = [], turnIndex = 0, state = "idle";
+let hE, vE, boxes;     // edges + box owners
+let pendingPlayers = 2, pendingSize = 5;
+let lastEdge = null;
+
+let W, H, GS, OX, OY, step;
+function computeLayout() {
+  W = canvas.clientWidth; H = canvas.clientHeight;
+  GS = Math.min(W * 0.9, H * 0.78);
+  step = GS / (D - 1);
+  OX = (W - GS) / 2; OY = (H - GS) / 2 + H * 0.02;
+}
+function dot(c, r) { return { x: OX + c * step, y: OY + r * step }; }
+
+function newGame(names) {
+  D = pendingSize;
+  computeLayout();
+  players = [];
+  for (let i = 0; i < pendingPlayers; i++) players.push({ ...COLORS[i], score: 0 });
+  if (names) players.forEach((p, i) => { if (names[i]) p.name = names[i]; });
+  hE = Array.from({ length: D }, () => Array(D - 1).fill(false));     // horizontal edges
+  vE = Array.from({ length: D - 1 }, () => Array(D).fill(false));     // vertical edges
+  boxes = Array.from({ length: D - 1 }, () => Array(D - 1).fill(0));  // owner (1-based) or 0
+  turnIndex = 0; state = "playing"; lastEdge = null;
+  document.getElementById("topbar").classList.remove("hidden");
+  endScreen.classList.add("hidden");
+  updateHUD();
+}
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = canvas.clientWidth * DPR; canvas.height = canvas.clientHeight * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  computeLayout();
+}
+window.addEventListener("resize", resize);
+
+// nearest undrawn edge to a tap
+function nearestEdge(px, py) {
+  let best = null, bd = step * 0.45;
+  for (let r = 0; r < D; r++) for (let c = 0; c < D - 1; c++) {
+    if (hE[r][c]) continue;
+    const mx = OX + (c + 0.5) * step, my = OY + r * step;
+    const d = Math.hypot(px - mx, py - my);
+    if (d < bd) { bd = d; best = { kind: "h", r, c }; }
+  }
+  for (let r = 0; r < D - 1; r++) for (let c = 0; c < D; c++) {
+    if (vE[r][c]) continue;
+    const mx = OX + c * step, my = OY + (r + 0.5) * step;
+    const d = Math.hypot(px - mx, py - my);
+    if (d < bd) { bd = d; best = { kind: "v", r, c }; }
+  }
+  return best;
+}
+
+function boxComplete(br, bc) {
+  return hE[br][bc] && hE[br + 1][bc] && vE[br][bc] && vE[br][bc + 1];
+}
+
+canvas.addEventListener("pointerdown", (e) => {
+  if (state !== "playing") return;
+  const rect = canvas.getBoundingClientRect();
+  const edge = nearestEdge(e.clientX - rect.left, e.clientY - rect.top);
+  if (!edge) return;
+  if (edge.kind === "h") hE[edge.r][edge.c] = true; else vE[edge.r][edge.c] = true;
+  lastEdge = edge;
+
+  // which boxes might have just been completed?
+  let claimed = 0;
+  const check = (br, bc) => {
+    if (br < 0 || bc < 0 || br >= D - 1 || bc >= D - 1) return;
+    if (boxes[br][bc] === 0 && boxComplete(br, bc)) { boxes[br][bc] = turnIndex + 1; players[turnIndex].score++; claimed++; }
+  };
+  if (edge.kind === "h") { check(edge.r - 1, edge.c); check(edge.r, edge.c); }
+  else { check(edge.r, edge.c - 1); check(edge.r, edge.c); }
+
+  if (claimed >= 2) Banter.say("combo", players[turnIndex].name);
+  else if (claimed === 1) Banter.say("good", players[turnIndex].name);
+
+  // game over?
+  const total = (D - 1) * (D - 1);
+  const filled = players.reduce((s, p) => s + p.score, 0);
+  if (filled === total) return finish();
+
+  if (claimed === 0) { turnIndex = (turnIndex + 1) % players.length; }
+  updateHUD();
+});
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  if (!boxes) return;
+
+  // claimed box fills
+  for (let r = 0; r < D - 1; r++) for (let c = 0; c < D - 1; c++) {
+    if (boxes[r][c]) {
+      const p = players[boxes[r][c] - 1];
+      ctx.fillStyle = p.soft;
+      ctx.fillRect(OX + c * step + step * 0.06, OY + r * step + step * 0.06, step * 0.88, step * 0.88);
+      ctx.fillStyle = p.fill; ctx.font = `bold ${step * 0.4}px "Comic Sans MS", sans-serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(p.name[0], OX + (c + 0.5) * step, OY + (r + 0.5) * step);
+    }
+  }
+
+  // drawn edges
+  const drawEdge = (x0, y0, x1, y1, on, hot) => {
+    ctx.lineCap = "round";
+    if (on) { ctx.strokeStyle = hot ? "#2c3e50" : "#34495e"; ctx.lineWidth = step * 0.09; }
+    else { ctx.strokeStyle = "rgba(120,110,90,0.18)"; ctx.lineWidth = step * 0.05; }
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  };
+  for (let r = 0; r < D; r++) for (let c = 0; c < D - 1; c++) {
+    const a = dot(c, r), b = dot(c + 1, r);
+    const hot = lastEdge && lastEdge.kind === "h" && lastEdge.r === r && lastEdge.c === c;
+    drawEdge(a.x, a.y, b.x, b.y, hE[r][c], hot);
+  }
+  for (let r = 0; r < D - 1; r++) for (let c = 0; c < D; c++) {
+    const a = dot(c, r), b = dot(c, r + 1);
+    const hot = lastEdge && lastEdge.kind === "v" && lastEdge.r === r && lastEdge.c === c;
+    drawEdge(a.x, a.y, b.x, b.y, vE[r][c], hot);
+  }
+
+  // dots
+  ctx.fillStyle = "#5d4d35";
+  for (let r = 0; r < D; r++) for (let c = 0; c < D; c++) {
+    const p = dot(c, r); ctx.beginPath(); ctx.arc(p.x, p.y, step * 0.08, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+function loop() { draw(); requestAnimationFrame(loop); }
+
+const startScreen = document.getElementById("startScreen");
+const endScreen = document.getElementById("endScreen");
+function updateHUD() {
+  const bar = document.getElementById("topbar");
+  bar.innerHTML = "";
+  players.forEach((p, i) => {
+    const pill = document.createElement("div");
+    pill.className = "pill";
+    pill.textContent = (i === turnIndex ? "▸ " : "") + p.name + " " + p.score;
+    pill.style.background = i === turnIndex ? p.fill : "rgba(255,255,255,0.95)";
+    pill.style.color = i === turnIndex ? "#fff" : "#2c3e50";
+    bar.appendChild(pill);
+  });
+  const reset = document.createElement("button");
+  reset.id = "resetBtn"; reset.textContent = "↺ New";
+  reset.addEventListener("click", backToStart);
+  bar.appendChild(reset);
+}
+function finish() {
+  state = "won";
+  const max = Math.max(...players.map((p) => p.score));
+  const winners = players.filter((p) => p.score === max);
+  document.getElementById("endTitle").textContent = winners.length > 1 ? "🤝 It's a tie!" : "🏆 " + winners[0].name + " wins!";
+  document.getElementById("endMsg").innerHTML =
+    players.map((p) => `${p.name}: <b>${p.score}</b>`).join(" &nbsp;·&nbsp; ") +
+    (winners.length > 1 ? `<br>Tied on ${max} boxes.` : `<br>with ${max} boxes!`);
+  if (winners.length === 1) Banter.say("win", winners[0].name);
+  updateHUD();
+  endScreen.classList.remove("hidden");
+}
+
+function backToStart() {
+  endScreen.classList.add("hidden"); startScreen.classList.remove("hidden");
+  document.getElementById("topbar").classList.add("hidden");
+  boxes = null; state = "idle";
+}
+
+document.querySelectorAll("#pcRow .opt").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("#pcRow .opt").forEach(x => x.classList.remove("sel"));
+  b.classList.add("sel"); pendingPlayers = +b.dataset.n;
+}));
+document.querySelectorAll("#szRow .opt").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("#szRow .opt").forEach(x => x.classList.remove("sel"));
+  b.classList.add("sel"); pendingSize = +b.dataset.s;
+}));
+document.getElementById("startBtn").addEventListener("click", () => {
+  const slots = COLORS.slice(0, pendingPlayers).map((c) => ({ label: c.name, color: c.fill }));
+  Banter.askNames({ title: "Dots & Boxes — players?", slots }, (names) => {
+    startScreen.classList.add("hidden"); newGame(names); Banter.say("start", players[0].name);
+  });
+});
+document.getElementById("againBtn").addEventListener("click", backToStart);
+
+resize();
+state = "idle";
+loop();
+</script>
+</body>
+</html>

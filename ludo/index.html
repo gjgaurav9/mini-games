@@ -115,6 +115,7 @@
   </div>
 </div>
 
+<script src="../shared/banter.js"></script>
 <script>
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
@@ -193,13 +194,14 @@ function pickColors(n) {
   return ["red", "green", "yellow", "blue"];
 }
 
-function newGame(n) {
+function newGame(n, names) {
   computeLayout();
   players = pickColors(n).map((color) => ({
     color, ...COLORDEF[color], start: STARTIDX[color],
     path: buildFullPath(color), slots: BASE[color].slots,
     tokens: [{ pos: -1 }, { pos: -1 }, { pos: -1 }, { pos: -1 }],
   }));
+  if (names) players.forEach((p, i) => { if (names[i]) p.name = names[i]; });
   turnIndex = 0; lastRoll = 0; sixStreak = 0; movable = []; mover = null;
   state = "ready";
   rollMsg = players[0].name + ": tap the dice 🎲";
@@ -236,8 +238,10 @@ function finishRoll() {
   if (lastRoll === 6) sixStreak++; else sixStreak = 0;
   if (sixStreak === 3) {
     rollMsg = p.name + " rolled three 6s — turn lost!";
+    Banter.say("unlucky", p.name);
     sixStreak = 0; passTurn(); return;
   }
+  if (lastRoll === 6) Banter.say("sixer", p.name);
   // who can move?
   movable = p.tokens.filter((t) => canMove(t, lastRoll));
   if (movable.length === 0) {
@@ -301,8 +305,8 @@ function resolveLanding(token) {
       }
     }
   }
-  if (captured) rollMsg = p.name + " captured! Send 'em home 🏠";
-  else if (reachedHome) rollMsg = p.name + " got a token home! ⭐";
+  if (captured) { rollMsg = p.name + " captured! Send 'em home 🏠"; Banter.say("capture", p.name); }
+  else if (reachedHome) { rollMsg = p.name + " got a token home! ⭐"; Banter.say("great", p.name); }
 
   if (p.tokens.every((t) => t.pos === 56)) return win(p);
 
@@ -489,6 +493,7 @@ function win(p) {
   state = "won";
   document.getElementById("endTitle").textContent = "🏆 " + p.name + " wins!";
   document.getElementById("endMsg").innerHTML = p.name + " got all 4 tokens home! 🎉";
+  Banter.say("win", p.name);
   endScreen.classList.remove("hidden");
 }
 
@@ -502,7 +507,12 @@ function backToStart() {
   document.getElementById("docker").classList.add("hidden");
   players = []; state = "idle";
 }
-document.getElementById("startBtn").addEventListener("click", () => { startScreen.classList.add("hidden"); newGame(pendingPlayers); });
+document.getElementById("startBtn").addEventListener("click", () => {
+  const slots = pickColors(pendingPlayers).map((c) => ({ label: COLORDEF[c].name, color: COLORDEF[c].fill }));
+  Banter.askNames({ title: "Ludo — who's playing?", slots }, (names) => {
+    startScreen.classList.add("hidden"); newGame(pendingPlayers, names); Banter.say("start", players[0].name);
+  });
+});
 document.getElementById("againBtn").addEventListener("click", backToStart);
 document.getElementById("resetBtn").addEventListener("click", () => { if (state === "moving" || state === "rolling") return; backToStart(); });
 diceEl.addEventListener("click", rollDice);

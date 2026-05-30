@@ -15,6 +15,9 @@ Each game is a single, self-contained `index.html` (HTML5 canvas + vanilla JavaS
 | 🎯 | **[Carrom](carrom-board-game/index.html)** | 2-player (White vs Black) or 4-player (2-v-2 partners). Flick the striker to pot your colour — pot one of yours and you go again, miss and pass the phone. Cover the Queen! The striker baseline rotates to whoever's turn it is. |
 | 🎲 | **[Ludo](ludo/index.html)** | 2–4 players. Roll a 6 to leave base, race your four tokens around and up your home lane to the centre, and capture rivals by landing on them. Sixes, captures and reaching home grant an extra turn. First to get all four tokens home wins. |
 | 🐍 | **[Snakes & Ladders](snake-and-ladder/index.html)** | 2–4 players. Tap the dice, climb the ladders, slide down the snakes, and race to 100 (exact roll to finish). Roll a 6 and go again. |
+| 🔴 | **[Connect 4](connect-4/index.html)** | 2 players. Take turns dropping discs into the columns — first to line up four in a row (across, down or diagonally) wins. |
+| ⬛ | **[Dots & Boxes](dots-and-boxes/index.html)** | 2–4 players, choose grid size. Draw one line per turn; close the fourth side of a box to claim it and go again. Most boxes wins. |
+| ♟️ | **[Checkers](checkers/index.html)** | 2 players. Diagonal moves, compulsory captures, multi-jumps and King promotion. Take all the rival's pieces (or leave them with no move) to win. |
 
 ## 🕹️ Quick solo play
 
@@ -34,6 +37,15 @@ Each game is a single, self-contained `index.html` (HTML5 canvas + vanilla JavaS
 - **← →** — walk
 - **↑ / Space** — jump (Apples), shake the tree (Banana), or pick the broccoli (Broccoli Garden)
 - **Mobile** — tap the screen sides to walk, tap the middle to jump / shake / pick
+
+## Names & commentary 🎙️
+
+Every game asks for player **names** on the start screen (saved in your browser's
+`localStorage`, so they're pre-filled next time). During play, a shared commentary
+engine ([`shared/banter.js`](shared/banter.js)) cheers players on at big moments
+with fun **Hinglish** dialogue — captures, combos, sixes, ladders, wins and more —
+inspired by Sidhuisms and gully-cricket banter (*“Kya baat {name}, maza aa gaya!”*,
+*“Saanp kha gaya {name} ko!”*). It's a single self-contained module each game loads.
 
 ## Design idea
 
