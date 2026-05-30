@@ -67,14 +67,75 @@
   .apple .play { background: #e74c3c; color: #fff; box-shadow: 0 5px 0 #a93226; }
   .broccoli .play { background: #66bb6a; color: #14380f; box-shadow: 0 5px 0 #2e7d32; }
   .carrom .play { background: #f1c40f; color: #5a4500; box-shadow: 0 5px 0 #b8860b; }
+  .snake .play { background: #27ae60; color: #fff; box-shadow: 0 5px 0 #1e8449; }
+  .ludo .play { background: #e74c3c; color: #fff; box-shadow: 0 5px 0 #a93226; }
+  .banner {
+    background: rgba(255,255,255,0.78);
+    border-radius: 20px;
+    padding: 18px 22px;
+    margin: 0 auto 36px;
+    max-width: 720px;
+    font-size: clamp(14px, 3vw, 18px);
+    color: #34495e;
+    line-height: 1.5;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  }
+  .banner b { color: #2c3e50; }
+  .section-title {
+    text-align: left;
+    font-size: clamp(20px, 4.5vw, 28px);
+    margin: 40px 0 6px;
+    color: #2c3e50;
+  }
+  .section-sub { text-align: left; font-size: clamp(13px, 3vw, 16px); color: #5d6d7e; margin-bottom: 18px; }
+  .tag {
+    display: inline-block; margin-top: 10px; font-size: 12px; font-weight: bold;
+    background: #2c3e50; color: #fff; padding: 3px 10px; border-radius: 20px;
+  }
   footer { margin-top: 48px; font-size: 14px; color: #5d6d7e; }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>🎮 Mini Games</h1>
-    <p class="subtitle">A cozy little collection. Pick one and play! 💛</p>
+    <h1>🎮 Pass &amp; Play</h1>
+    <p class="subtitle">Mini games for one shared phone — gather round like the old days. 💛</p>
 
+    <div class="banner">
+      No servers, no accounts, no “add friend”. <b>Your phone is the board.</b>
+      Put it on the table, everyone sits around it, and you take turns on the same
+      screen — just like a real board game. Works offline, nothing to install.
+    </div>
+
+    <h2 class="section-title">🪑 Gather round — board games</h2>
+    <p class="section-sub">2–4 players on one device, taking turns.</p>
+    <div class="grid">
+      <a class="card carrom" href="carrom-board-game/index.html">
+        <span class="emoji">🎯</span>
+        <h2>Carrom</h2>
+        <p>Flick the striker and pot your colour. Pot one of yours and go again, miss and pass the phone. Cover the Queen!</p>
+        <span class="tag">2 or 4 players</span><br>
+        <span class="play">Play ▶</span>
+      </a>
+
+      <a class="card ludo" href="ludo/index.html">
+        <span class="emoji">🎲</span>
+        <h2>Ludo</h2>
+        <p>Roll a 6 to set off, race your four tokens home, and send rivals back to base if you land on them. First one home wins.</p>
+        <span class="tag">2–4 players</span><br>
+        <span class="play">Play ▶</span>
+      </a>
+
+      <a class="card snake" href="snake-and-ladder/index.html">
+        <span class="emoji">🐍</span>
+        <h2>Snakes &amp; Ladders</h2>
+        <p>Tap the dice, climb the ladders, dodge the snakes, and race everyone to 100. Roll a 6 and go again!</p>
+        <span class="tag">2–4 players</span><br>
+        <span class="play">Play ▶</span>
+      </a>
+    </div>
+
+    <h2 class="section-title">🕹️ Quick solo play</h2>
+    <p class="section-sub">Cozy single-player collecting games — pass the phone for high-score turns.</p>
     <div class="grid">
       <a class="card apple" href="apple-collecting-game/index.html">
         <span class="emoji">🍎</span>
@@ -96,16 +157,9 @@
         <p>Ben picks ripe broccoli from the garden beds — but hungry bunnies want it too! Be quick and bring the harvest home to Mom.</p>
         <span class="play">Play ▶</span>
       </a>
-
-      <a class="card carrom" href="carrom-board-game/index.html">
-        <span class="emoji">🎯</span>
-        <h2>Carrom (Karam)</h2>
-        <p>The classic flick-the-striker board game. Slingshot the striker into the coins and sink all 19 — plus the Queen — into the corner pockets.</p>
-        <span class="play">Play ▶</span>
-      </a>
     </div>
 
-    <footer>More games coming soon ✨</footer>
+    <footer>More gather-round games coming soon ✨</footer>
   </div>
 </body>
 </html>

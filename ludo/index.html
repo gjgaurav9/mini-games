@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🎲 Ludo — Pass & Play</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    font-family: "Comic Sans MS", "Trebuchet MS", sans-serif;
+    overflow: hidden;
+    background: #20222b;
+    user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  #game {
+    position: relative; width: 100vw; height: 100vh;
+    background: radial-gradient(circle at 50% 30%, #2c2f3a 0%, #15171e 100%);
+    overflow: hidden;
+  }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  .overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: rgba(0,0,0,0.6); color: #fff; padding: 24px; z-index: 10;
+  }
+  .overlay h1 { font-size: clamp(30px, 7vw, 60px); text-shadow: 3px 3px 0 #e74c3c; }
+  .overlay p { font-size: clamp(15px, 3vw, 22px); margin: 10px 0; max-width: 600px; }
+  .btn {
+    margin-top: 10px; padding: 14px 30px; font-size: clamp(18px, 4vw, 26px);
+    font-family: inherit; border: none; border-radius: 50px;
+    background: #e74c3c; color: #fff; cursor: pointer; box-shadow: 0 6px 0 #a93226;
+    transition: transform .05s;
+  }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #a93226; }
+  .btnRow { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+  .pcBtn {
+    width: 64px; height: 64px; border-radius: 18px; border: 3px solid transparent;
+    background: rgba(255,255,255,0.15); color: #fff; font-size: 26px; font-family: inherit; cursor: pointer;
+  }
+  .pcBtn.sel { border-color: #f1c40f; background: rgba(241,196,15,0.25); }
+  .hidden { display: none !important; }
+
+  #topbar {
+    position: absolute; top: 10px; left: 10px; right: 10px; z-index: 5;
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  }
+  .pill {
+    background: rgba(255,255,255,0.92); padding: 7px 14px; border-radius: 16px;
+    font-size: clamp(13px, 3.2vw, 20px); color: #2c3e50; box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+    white-space: nowrap; font-weight: bold;
+  }
+  #resetBtn {
+    margin-left: auto; background: rgba(255,255,255,0.92); border: none; font-family: inherit;
+    padding: 7px 14px; border-radius: 16px; font-size: clamp(13px, 3.2vw, 18px);
+    color: #2c3e50; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  }
+  #docker {
+    position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+    z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  #rollMsg { color: #ecf0f1; font-size: clamp(13px, 3vw, 18px); min-height: 1.2em; text-shadow: 0 1px 3px #000; text-align: center; }
+  #dice {
+    width: clamp(60px, 15vw, 80px); height: clamp(60px, 15vw, 80px);
+    background: #fff; border-radius: 16px; cursor: pointer;
+    box-shadow: 0 6px 0 #b0b0b0, 0 10px 16px rgba(0,0,0,0.4);
+    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+    padding: 14%; gap: 6%; transition: transform .06s;
+  }
+  #dice:active { transform: translateY(3px); }
+  #dice.disabled { opacity: .5; pointer-events: none; }
+  .dot { background: #2c3e50; border-radius: 50%; align-self: center; justify-self: center; width: 80%; height: 80%; visibility: hidden; }
+  .dot.s { visibility: visible; }
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="canvas"></canvas>
+
+  <div id="topbar" class="hidden">
+    <div class="pill" id="turnPill">Turn</div>
+    <button id="resetBtn">↺ New</button>
+  </div>
+
+  <div id="docker" class="hidden">
+    <div id="rollMsg">Tap the dice 🎲</div>
+    <div id="dice">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
+  </div>
+
+  <!-- Start -->
+  <div id="startScreen" class="overlay">
+    <h1>🎲 Ludo</h1>
+    <p>One phone, the whole family. Roll a <b>6</b> to bring a token out,
+       race them around and up your colour lane to the centre. Land on a
+       rival to send it home! First to get all 4 tokens home wins.</p>
+    <p style="font-size:clamp(14px,3vw,20px);opacity:.85">How many players?</p>
+    <div class="btnRow" id="pcRow">
+      <button class="pcBtn sel" data-n="2">2</button>
+      <button class="pcBtn" data-n="3">3</button>
+      <button class="pcBtn" data-n="4">4</button>
+    </div>
+    <button class="btn" id="startBtn">Start</button>
+  </div>
+
+  <!-- End -->
+  <div id="endScreen" class="overlay hidden">
+    <h1 id="endTitle">🏆</h1>
+    <p id="endMsg"></p>
+    <button class="btn" id="againBtn">Play Again</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+// ---- 52-cell main track (col,row) on a 15x15 grid, clockwise ----
+const TRACK = [
+  [6,13],[6,12],[6,11],[6,10],[6,9],
+  [5,8],[4,8],[3,8],[2,8],[1,8],[0,8],
+  [0,7],
+  [0,6],[1,6],[2,6],[3,6],[4,6],[5,6],
+  [6,5],[6,4],[6,3],[6,2],[6,1],[6,0],
+  [7,0],
+  [8,0],[8,1],[8,2],[8,3],[8,4],[8,5],
+  [9,6],[10,6],[11,6],[12,6],[13,6],[14,6],
+  [14,7],
+  [14,8],[13,8],[12,8],[11,8],[10,8],[9,8],
+  [8,9],[8,10],[8,11],[8,12],[8,13],[8,14],
+  [7,14],
+  [6,14],
+];
+const SAFE = new Set([0, 8, 13, 21, 26, 34, 39, 47]); // start + star squares
+
+// home lanes (6 colored cells leading to centre) per colour
+const HOME = {
+  red:    [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],
+  green:  [[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],
+  yellow: [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]],
+  blue:   [[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],
+};
+const STARTIDX = { red: 13, green: 26, yellow: 39, blue: 0 };
+const BASE = {  // 6x6 corner origin (col,row) + 4 token slots
+  red:    { ox: 0, oy: 0, slots: [[1,1],[4,1],[1,4],[4,4]] },
+  green:  { ox: 9, oy: 0, slots: [[10,1],[13,1],[10,4],[13,4]] },
+  yellow: { ox: 9, oy: 9, slots: [[10,10],[13,10],[10,13],[13,13]] },
+  blue:   { ox: 0, oy: 9, slots: [[1,10],[4,10],[1,13],[4,13]] },
+};
+const COLORDEF = {
+  red:    { fill: "#e74c3c", dark: "#a93226", name: "Red" },
+  green:  { fill: "#2ecc71", dark: "#1e8449", name: "Green" },
+  yellow: { fill: "#f1c40f", dark: "#b8860b", name: "Yellow" },
+  blue:   { fill: "#3498db", dark: "#21618c", name: "Blue" },
+};
+// clockwise seating order
+const ORDER = ["red", "green", "yellow", "blue"];
+
+function buildFullPath(color) {
+  const start = STARTIDX[color];
+  const path = [];
+  for (let i = 0; i <= 50; i++) path.push(TRACK[(start + i) % 52]);
+  for (const c of HOME[color]) path.push(c);
+  return path; // length 57, index 56 = home
+}
+
+// ---- Layout ----
+let W, H, BSZ, OX, OY, cell;
+function computeLayout() {
+  W = canvas.clientWidth; H = canvas.clientHeight;
+  BSZ = Math.min(W * 0.96, H * 0.86);
+  cell = BSZ / 15;
+  OX = (W - BSZ) / 2;
+  OY = (H - BSZ) / 2 + Math.min(10, H * 0.01);
+}
+function cc(col, row) { return { x: OX + (col + 0.5) * cell, y: OY + (row + 0.5) * cell }; }
+
+// ---- State ----
+let players = [], turnIndex = 0, state = "idle", pendingPlayers = 2;
+let lastRoll = 0, sixStreak = 0;
+let movable = [];        // tokens eligible to move after a roll
+let mover = null;        // {token, queue:[pos...], fromPos, t, dur}
+let diceUntil = 0, rollMsg = "Tap the dice 🎲";
+
+function pickColors(n) {
+  if (n === 2) return ["red", "yellow"];
+  if (n === 3) return ["red", "green", "yellow"];
+  return ["red", "green", "yellow", "blue"];
+}
+
+function newGame(n) {
+  computeLayout();
+  players = pickColors(n).map((color) => ({
+    color, ...COLORDEF[color], start: STARTIDX[color],
+    path: buildFullPath(color), slots: BASE[color].slots,
+    tokens: [{ pos: -1 }, { pos: -1 }, { pos: -1 }, { pos: -1 }],
+  }));
+  turnIndex = 0; lastRoll = 0; sixStreak = 0; movable = []; mover = null;
+  state = "ready";
+  rollMsg = players[0].name + ": tap the dice 🎲";
+  document.getElementById("topbar").classList.remove("hidden");
+  document.getElementById("docker").classList.remove("hidden");
+  endScreen.classList.add("hidden");
+  setDiceFace(0); updateHUD();
+}
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = canvas.clientWidth * DPR;
+  canvas.height = canvas.clientHeight * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  computeLayout();
+}
+window.addEventListener("resize", resize);
+
+// ---- Dice ----
+const FACE = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+const diceEl = document.getElementById("dice");
+const dots = [...diceEl.querySelectorAll(".dot")];
+function setDiceFace(f) { dots.forEach((d, i) => d.classList.toggle("s", f > 0 && FACE[f].includes(i))); }
+
+function rollDice() {
+  if (state !== "ready") return;
+  state = "rolling"; diceUntil = Date.now() + 600;
+  rollMsg = "Rolling…"; diceEl.classList.add("disabled"); updateHUD();
+}
+function finishRoll() {
+  lastRoll = 1 + Math.floor(Math.random() * 6);
+  setDiceFace(lastRoll); diceEl.classList.remove("disabled");
+  const p = players[turnIndex];
+  if (lastRoll === 6) sixStreak++; else sixStreak = 0;
+  if (sixStreak === 3) {
+    rollMsg = p.name + " rolled three 6s — turn lost!";
+    sixStreak = 0; passTurn(); return;
+  }
+  // who can move?
+  movable = p.tokens.filter((t) => canMove(t, lastRoll));
+  if (movable.length === 0) {
+    rollMsg = p.name + " rolled " + lastRoll + " — no move";
+    setTimeout(() => { if (lastRoll === 6) { state = "ready"; rollMsg = p.name + ": rolled a 6, roll again"; updateHUD(); } else passTurn(); }, 650);
+    state = "wait";
+    return;
+  }
+  rollMsg = p.name + " rolled " + lastRoll + " — pick a token";
+  if (movable.length === 1) { state = "wait"; setTimeout(() => doMove(movable[0]), 350); }
+  else { state = "select"; }
+  updateHUD();
+}
+function canMove(t, roll) {
+  if (t.pos === 56) return false;
+  if (t.pos === -1) return roll === 6;
+  return t.pos + roll <= 56;
+}
+
+// ---- Move ----
+function doMove(token) {
+  if (state !== "select" && state !== "wait") return;
+  const queue = [];
+  if (token.pos === -1) { queue.push(0); }
+  else { for (let k = token.pos + 1; k <= token.pos + lastRoll; k++) queue.push(k); }
+  mover = { token, queue, fromPos: token.pos, t: 0, dur: 9 };
+  state = "moving"; movable = [];
+}
+function spotForToken(player, tokenIdx, pos) {
+  if (pos < 0) { const s = player.slots[tokenIdx]; return cc(s[0], s[1]); }
+  const c = player.path[pos];
+  const base = cc(c[0], c[1]);
+  // small spread if more than one token shares this exact cell
+  let share = 0, before = 0;
+  player.tokens.forEach((t, i) => { if (t.pos === pos) { share++; if (i < tokenIdx) before++; } });
+  if (share > 1 && pos < 56) {
+    const off = (before - (share - 1) / 2) * cell * 0.22;
+    return { x: base.x + off, y: base.y };
+  }
+  return base;
+}
+
+function finishStep() {
+  const token = mover.token;
+  token.pos = mover.queue.shift();
+  mover.fromPos = token.pos; mover.t = 0;
+  if (mover.queue.length === 0) { mover = null; resolveLanding(token); }
+}
+
+function resolveLanding(token) {
+  const p = players[turnIndex];
+  let captured = false, reachedHome = token.pos === 56;
+  if (token.pos <= 50) {
+    const g = (p.start + token.pos) % 52;
+    if (!SAFE.has(g)) {
+      for (const op of players) {
+        if (op === p) continue;
+        for (const t of op.tokens) {
+          if (t.pos >= 0 && t.pos <= 50 && (op.start + t.pos) % 52 === g) { t.pos = -1; captured = true; }
+        }
+      }
+    }
+  }
+  if (captured) rollMsg = p.name + " captured! Send 'em home 🏠";
+  else if (reachedHome) rollMsg = p.name + " got a token home! ⭐";
+
+  if (p.tokens.every((t) => t.pos === 56)) return win(p);
+
+  if (lastRoll === 6 || captured || reachedHome) {
+    state = "ready";
+    rollMsg += "  ·  " + p.name + " goes again 🎲";
+    updateHUD();
+  } else passTurn();
+}
+
+function passTurn() {
+  turnIndex = (turnIndex + 1) % players.length;
+  sixStreak = 0;
+  state = "ready";
+  rollMsg = players[turnIndex].name + ": tap the dice 🎲";
+  setDiceFace(0);
+  updateHUD();
+}
+
+// ---- Input ----
+canvas.addEventListener("pointerdown", (e) => {
+  if (state !== "select") return;
+  const rect = canvas.getBoundingClientRect();
+  const px = e.clientX - rect.left, py = e.clientY - rect.top;
+  const p = players[turnIndex];
+  let best = null, bd = cell * 0.7;
+  for (const t of movable) {
+    const idx = p.tokens.indexOf(t);
+    const s = spotForToken(p, idx, t.pos);
+    const d = Math.hypot(px - s.x, py - s.y);
+    if (d < bd) { bd = d; best = t; }
+  }
+  if (best) doMove(best);
+});
+
+// ---- Render ----
+function rr(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function drawBoard() {
+  // board backing
+  ctx.fillStyle = "#ffffff";
+  rr(OX, OY, BSZ, BSZ, cell * 0.3); ctx.fill();
+  ctx.strokeStyle = "#2c3e50"; ctx.lineWidth = Math.max(2, cell * 0.08);
+  rr(OX, OY, BSZ, BSZ, cell * 0.3); ctx.stroke();
+
+  // 6x6 colour bases
+  for (const color of ["red", "green", "yellow", "blue"]) {
+    const b = BASE[color], cdef = COLORDEF[color];
+    const x = OX + b.ox * cell, y = OY + b.oy * cell, sz = cell * 6;
+    ctx.fillStyle = cdef.fill;
+    rr(x, y, sz, sz, cell * 0.25); ctx.fill();
+    // inner white pad
+    ctx.fillStyle = "#fbfbfb";
+    rr(x + cell, y + cell, sz - cell * 2, sz - cell * 2, cell * 0.2); ctx.fill();
+    // sockets
+    for (const s of b.slots) {
+      const c = cc(s[0], s[1]);
+      ctx.fillStyle = cdef.fill;
+      ctx.beginPath(); ctx.arc(c.x, c.y, cell * 0.42, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#fbfbfb";
+      ctx.beginPath(); ctx.arc(c.x, c.y, cell * 0.3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // track cells
+  ctx.lineWidth = 1; ctx.strokeStyle = "#9aa4ad";
+  for (let i = 0; i < 52; i++) {
+    const [col, row] = TRACK[i];
+    const x = OX + col * cell, y = OY + row * cell;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(x, y, cell, cell); ctx.strokeRect(x, y, cell, cell);
+  }
+  // colour the start squares + safe stars
+  const startColorByIdx = { 13: "red", 26: "green", 39: "yellow", 0: "blue" };
+  for (let i = 0; i < 52; i++) {
+    const [col, row] = TRACK[i];
+    const x = OX + col * cell, y = OY + row * cell;
+    if (startColorByIdx[i]) { ctx.fillStyle = COLORDEF[startColorByIdx[i]].fill; ctx.fillRect(x, y, cell, cell); ctx.strokeRect(x, y, cell, cell); }
+    else if (SAFE.has(i)) {
+      ctx.fillStyle = "#ecf0f1"; ctx.fillRect(x, y, cell, cell); ctx.strokeRect(x, y, cell, cell);
+      ctx.fillStyle = "#b2bec3"; ctx.font = `${cell * 0.7}px serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("★", x + cell / 2, y + cell / 2 + cell * 0.05);
+    }
+  }
+  // home lanes
+  for (const color of ["red", "green", "yellow", "blue"]) {
+    ctx.fillStyle = COLORDEF[color].fill;
+    for (const [col, row] of HOME[color]) {
+      const x = OX + col * cell, y = OY + row * cell;
+      ctx.fillRect(x, y, cell, cell); ctx.strokeStyle = "#9aa4ad"; ctx.strokeRect(x, y, cell, cell);
+    }
+  }
+  // centre home triangles (cols6-8, rows6-8)
+  const C = cc(7, 7);
+  const tri = (a, b, color) => { ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(C.x, C.y); ctx.closePath(); ctx.fill(); };
+  // corners of the 3x3 centre
+  const p_tl = { x: OX + 6 * cell, y: OY + 6 * cell };
+  const p_tr = { x: OX + 9 * cell, y: OY + 6 * cell };
+  const p_bl = { x: OX + 6 * cell, y: OY + 9 * cell };
+  const p_br = { x: OX + 9 * cell, y: OY + 9 * cell };
+  tri(p_tl, p_tr, COLORDEF.green.fill);
+  tri(p_tr, p_br, COLORDEF.yellow.fill);
+  tri(p_br, p_bl, COLORDEF.blue.fill);
+  tri(p_bl, p_tl, COLORDEF.red.fill);
+}
+
+function drawToken(player, idx, x, y, highlight) {
+  const r = cell * 0.34;
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.beginPath(); ctx.ellipse(x, y + r * 0.5, r * 0.9, r * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+  const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.4, r * 0.2, x, y, r);
+  g.addColorStop(0, "#fff"); g.addColorStop(0.3, player.fill); g.addColorStop(1, player.dark);
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = player.dark; ctx.lineWidth = Math.max(1.5, r * 0.12);
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.beginPath(); ctx.arc(x, y - r * 0.15, r * 0.32, 0, Math.PI * 2); ctx.fill();
+  if (highlight) {
+    const t = (Math.sin(Date.now() / 250) + 1) / 2;
+    ctx.strokeStyle = `rgba(46,204,113,${0.5 + t * 0.5})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, r + 4 + t * 3, 0, Math.PI * 2); ctx.stroke();
+  }
+}
+
+function easeInOut(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+
+function update() {
+  if (state === "rolling") {
+    if (Date.now() >= diceUntil) finishRoll();
+    else setDiceFace(1 + Math.floor(Date.now() / 60) % 6);
+  }
+  if (state === "moving" && mover) {
+    mover.t++;
+    if (mover.t >= mover.dur) finishStep();
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  if (!players.length) { computeLayout(); drawBoard(); return; }
+  drawBoard();
+
+  const ap = players[turnIndex];
+  for (const player of players) {
+    player.tokens.forEach((t, idx) => {
+      let x, y, hl = false;
+      if (mover && player === ap && t === mover.token) {
+        const from = spotForToken(player, idx, mover.fromPos);
+        const toPos = mover.queue.length ? mover.queue[0] : t.pos;
+        const to = spotForToken(player, idx, toPos);
+        const k = easeInOut(Math.min(1, mover.t / mover.dur));
+        x = from.x + (to.x - from.x) * k; y = from.y + (to.y - from.y) * k;
+        y -= Math.sin(k * Math.PI) * cell * 0.35; // hop
+      } else {
+        const s = spotForToken(player, idx, t.pos);
+        x = s.x; y = s.y;
+        if (state === "select" && player === ap && movable.includes(t)) hl = true;
+      }
+      drawToken(player, idx, x, y, hl);
+    });
+  }
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+// ---- HUD / screens ----
+const startScreen = document.getElementById("startScreen");
+const endScreen = document.getElementById("endScreen");
+function updateHUD() {
+  if (!players.length) return;
+  const p = players[turnIndex];
+  const tp = document.getElementById("turnPill");
+  const homeCount = p.tokens.filter((t) => t.pos === 56).length;
+  tp.innerHTML = `▸ ${p.name} · home ${homeCount}/4`;
+  tp.style.background = p.fill; tp.style.color = "#fff";
+  document.getElementById("rollMsg").textContent = rollMsg;
+}
+function win(p) {
+  state = "won";
+  document.getElementById("endTitle").textContent = "🏆 " + p.name + " wins!";
+  document.getElementById("endMsg").innerHTML = p.name + " got all 4 tokens home! 🎉";
+  endScreen.classList.remove("hidden");
+}
+
+document.querySelectorAll(".pcBtn").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll(".pcBtn").forEach(x => x.classList.remove("sel"));
+  b.classList.add("sel"); pendingPlayers = +b.dataset.n;
+}));
+function backToStart() {
+  endScreen.classList.add("hidden"); startScreen.classList.remove("hidden");
+  document.getElementById("topbar").classList.add("hidden");
+  document.getElementById("docker").classList.add("hidden");
+  players = []; state = "idle";
+}
+document.getElementById("startBtn").addEventListener("click", () => { startScreen.classList.add("hidden"); newGame(pendingPlayers); });
+document.getElementById("againBtn").addEventListener("click", backToStart);
+document.getElementById("resetBtn").addEventListener("click", () => { if (state === "moving" || state === "rolling") return; backToStart(); });
+diceEl.addEventListener("click", rollDice);
+
+// ---- Boot ----
+resize();
+state = "idle";
+loop();
+</script>
+</body>
+</html>
