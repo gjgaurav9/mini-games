@@ -196,6 +196,10 @@
   #banterMute{position:fixed;left:12px;bottom:12px;z-index:62;width:42px;height:42px;border-radius:50%;
     border:none;cursor:pointer;font-size:20px;background:rgba(255,255,255,0.9);box-shadow:0 3px 8px rgba(0,0,0,0.35);}
   #banterMute:active{transform:translateY(2px);}
+  #banterHome{position:fixed;left:62px;bottom:12px;z-index:62;width:42px;height:42px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:20px;
+    background:rgba(255,255,255,0.9);box-shadow:0 3px 8px rgba(0,0,0,0.35);}
+  #banterHome:active{transform:translateY(2px);}
   .banterModal{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
     background:rgba(0,0,0,0.72);padding:20px;font-family:"Comic Sans MS","Trebuchet MS",sans-serif;}
   .banterCard{background:#fff;color:#2c3e50;border-radius:24px;padding:24px 22px;max-width:420px;width:100%;
@@ -231,6 +235,12 @@
       if (!muted) sfx("good");
     });
     document.body.appendChild(mute);
+    const home = document.createElement("a");
+    home.id = "banterHome";
+    home.href = "../index.html";
+    home.textContent = "🏠";
+    home.title = "Back to all games";
+    document.body.appendChild(home);
   }
 
   let toastTimer = null;
@@ -280,4 +290,8 @@
   }
 
   window.Banter = { askNames, say, sfx, loadNames, saveNames };
+
+  // show the 🏠 home + 🔊 mute controls right away, even before a game starts
+  if (document.body) ensureDom();
+  else document.addEventListener("DOMContentLoaded", ensureDom);
 })();
