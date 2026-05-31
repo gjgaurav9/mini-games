@@ -69,7 +69,19 @@
     padding: 14%; gap: 6%; transition: transform .06s;
   }
   #dice:active { transform: translateY(3px); }
-  #dice.disabled { opacity: .5; pointer-events: none; }
+  #dice.disabled { opacity: .9; pointer-events: none; }
+  @keyframes diceTumble{0%{transform:rotate(0) translateY(0) scale(1);}
+    20%{transform:rotate(150deg) translateY(-24px) scale(1.12);}
+    40%{transform:rotate(300deg) translateY(0) scale(.95);}
+    60%{transform:rotate(470deg) translateY(-16px) scale(1.08);}
+    80%{transform:rotate(620deg) translateY(0) scale(.98);}
+    100%{transform:rotate(720deg) translateY(0) scale(1);}}
+  #dice.rolling{animation:diceTumble .62s ease-in-out;}
+  @keyframes diceLand{0%{transform:scale(1.22);}55%{transform:scale(.9);}100%{transform:scale(1);}}
+  #dice.land{animation:diceLand .22s ease-out;}
+  @keyframes dicePulse{0%,100%{box-shadow:0 6px 0 #b0b0b0,0 10px 16px rgba(0,0,0,.4),0 0 0 0 rgba(241,196,15,.75);}
+    50%{box-shadow:0 6px 0 #b0b0b0,0 10px 16px rgba(0,0,0,.4),0 0 0 14px rgba(241,196,15,0);}}
+  #dice.ready{animation:dicePulse 1.1s infinite;}
   .dot { background: #2c3e50; border-radius: 50%; align-self: center; justify-self: center; width: 80%; height: 80%; visibility: hidden; }
   .dot.s { visibility: visible; }
 </style>
@@ -228,12 +240,16 @@ function setDiceFace(f) { dots.forEach((d, i) => d.classList.toggle("s", f > 0 &
 
 function rollDice() {
   if (state !== "ready") return;
-  state = "rolling"; diceUntil = Date.now() + 600;
-  rollMsg = "Rolling…"; Banter.sfx("dice"); diceEl.classList.add("disabled"); updateHUD();
+  state = "rolling"; diceUntil = Date.now() + 650;
+  rollMsg = "Rolling…"; Banter.sfx("dice");
+  diceEl.classList.remove("ready", "land"); diceEl.classList.add("disabled", "rolling");
+  updateHUD();
 }
 function finishRoll() {
   lastRoll = 1 + Math.floor(Math.random() * 6);
-  setDiceFace(lastRoll); diceEl.classList.remove("disabled");
+  setDiceFace(lastRoll);
+  diceEl.classList.remove("disabled", "rolling");
+  diceEl.classList.add("land"); setTimeout(() => diceEl.classList.remove("land"), 240);
   const p = players[turnIndex];
   if (lastRoll === 6) sixStreak++; else sixStreak = 0;
   if (sixStreak === 3) {
@@ -488,9 +504,12 @@ function updateHUD() {
   tp.innerHTML = `▸ ${p.name} · home ${homeCount}/4`;
   tp.style.background = p.fill; tp.style.color = "#fff";
   document.getElementById("rollMsg").textContent = rollMsg;
+  Banter.turn(p.name, p.fill, state === "select" ? "tap a token" : (state === "ready" ? "tap the dice 🎲" : ""));
+  diceEl.classList.toggle("ready", state === "ready");
 }
 function win(p) {
   state = "won";
+  Banter.turnClear();
   document.getElementById("endTitle").textContent = "🏆 " + p.name + " wins!";
   document.getElementById("endMsg").innerHTML = p.name + " got all 4 tokens home! 🎉";
   Banter.say("win", p.name);
@@ -502,6 +521,7 @@ document.querySelectorAll(".pcBtn").forEach((b) => b.addEventListener("click", (
   b.classList.add("sel"); pendingPlayers = +b.dataset.n;
 }));
 function backToStart() {
+  Banter.turnClear();
   endScreen.classList.add("hidden"); startScreen.classList.remove("hidden");
   document.getElementById("topbar").classList.add("hidden");
   document.getElementById("docker").classList.add("hidden");

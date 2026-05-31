@@ -668,10 +668,12 @@ function updateHUD() {
   document.getElementById("whiteLeft").textContent = pieces.filter(p => p.active && p.color === "white").length;
   document.getElementById("blackLeft").textContent = pieces.filter(p => p.active && p.color === "black").length;
   document.getElementById("queenState").textContent = queenState;
+  Banter.turn(a.name, a.color === "white" ? "#f3e7c9" : "#3b2f2a", state === "ready" ? "your shot 🎯" : "");
 }
 function win(team) {
   state = "won";
   toast = null;
+  Banter.turnClear();
   document.getElementById("endTitle").textContent = "🎉 " + teamName(team) + " wins!";
   let msg = (playerCount === 4 ? teamName(team) : players.find(p => p.team === team).name + " (" + (team === 0 ? "White" : "Black") + ")")
     + " potted all their coins.";
@@ -695,8 +697,8 @@ function startCarrom(count) {
 }
 document.getElementById("play2").addEventListener("click", () => startCarrom(2));
 document.getElementById("play4").addEventListener("click", () => startCarrom(4));
-document.getElementById("againBtn").addEventListener("click", () => { endScreen.classList.add("hidden"); startScreen.classList.remove("hidden"); document.getElementById("hud").classList.add("hidden"); state = "idle"; });
-document.getElementById("resetBtn").addEventListener("click", () => { if (state === "moving") return; endScreen.classList.add("hidden"); startScreen.classList.remove("hidden"); document.getElementById("hud").classList.add("hidden"); state = "idle"; });
+document.getElementById("againBtn").addEventListener("click", () => { endScreen.classList.add("hidden"); startScreen.classList.remove("hidden"); document.getElementById("hud").classList.add("hidden"); Banter.turnClear(); state = "idle"; });
+document.getElementById("resetBtn").addEventListener("click", () => { if (state === "moving") return; endScreen.classList.add("hidden"); startScreen.classList.remove("hidden"); document.getElementById("hud").classList.add("hidden"); Banter.turnClear(); state = "idle"; });
 
 // ---- Boot ----
 resize();

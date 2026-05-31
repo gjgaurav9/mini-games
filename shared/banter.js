@@ -138,9 +138,33 @@
     src.connect(f).connect(g).connect(a.destination);
     src.start();
   }
+  // a single dice "clack" on a board: noisy transient + short woody body, scheduled at time t
+  function clack(a, t, freq, dur, vol) {
+    const n = Math.floor(a.sampleRate * dur);
+    const buf = a.createBuffer(1, n, a.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2);
+    const src = a.createBufferSource(); src.buffer = buf;
+    const bp = a.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = freq; bp.Q.value = 1.3;
+    const g = a.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp).connect(g).connect(a.destination); src.start(t); src.stop(t + dur + 0.02);
+    const o = a.createOscillator(); o.type = "triangle"; o.frequency.setValueAtTime(freq * 0.32, t);
+    const g2 = a.createGain(); g2.gain.setValueAtTime(vol * 0.5, t); g2.gain.exponentialRampToValueAtTime(0.0001, t + dur * 0.8);
+    o.connect(g2).connect(a.destination); o.start(t); o.stop(t + dur + 0.02);
+  }
 
   const SFX = {
-    dice() { for (let i = 0; i < 5; i++) tone({ f: 180 + Math.random() * 320, f2: 110, dur: 0.05, type: "square", vol: 0.12, delay: i * 0.085 }); noise(0.14, 0.05); },
+    dice() {
+      const a = ac(); if (!a || muted) return;
+      const now = a.currentTime;
+      const count = 6 + Math.floor(Math.random() * 2);
+      let t = now;
+      for (let i = 0; i < count; i++) {            // tumbling clacks, speeding up then slowing
+        clack(a, t, 850 + Math.random() * 1700, 0.045 + Math.random() * 0.03, 0.13);
+        t += 0.05 + Math.random() * 0.04;
+      }
+      clack(a, t + 0.05, 480, 0.13, 0.22);          // final settle thunk
+    },
     drop() { tone({ f: 520, f2: 120, dur: 0.18, type: "sine", vol: 0.25 }); },
     pot() { tone({ f: 720, f2: 200, dur: 0.14, type: "triangle", vol: 0.2 }); noise(0.05, 0.04); },
     strike() { tone({ f: 280, f2: 620, dur: 0.07, type: "square", vol: 0.15 }); },
@@ -193,12 +217,20 @@
 
   // ===================== DOM (toast + mute button) =====================
   const css = `
-  #banterToast{position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-14px);
+  #banterToast{position:fixed;top:104px;left:50%;transform:translateX(-50%) translateY(-14px);
     z-index:60;max-width:90vw;background:rgba(20,28,40,0.94);color:#fff;font-family:"Comic Sans MS","Trebuchet MS",sans-serif;
     font-size:clamp(15px,3.6vw,22px);font-weight:bold;padding:11px 20px;border-radius:18px;
     box-shadow:0 8px 24px rgba(0,0,0,0.45);border:2px solid rgba(241,196,15,0.85);
     opacity:0;pointer-events:none;transition:opacity .25s, transform .25s;text-align:center;white-space:normal;}
   #banterToast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #banterTurn{position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:58;display:none;
+    font-family:"Comic Sans MS","Trebuchet MS",sans-serif;font-weight:bold;font-size:clamp(16px,4.4vw,28px);
+    color:#fff;padding:8px 22px;border-radius:30px;box-shadow:0 6px 18px rgba(0,0,0,0.4);
+    border:3px solid rgba(255,255,255,0.9);max-width:94vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    text-shadow:0 1px 3px rgba(0,0,0,0.4);pointer-events:none;}
+  #banterTurn.show{display:block;}
+  @keyframes banterTurnPop{0%{transform:translateX(-50%) scale(.65);}60%{transform:translateX(-50%) scale(1.12);}100%{transform:translateX(-50%) scale(1);}}
+  #banterTurn.pop{animation:banterTurnPop .35s ease-out;}
   #banterMute{position:fixed;left:12px;bottom:12px;z-index:62;width:42px;height:42px;border-radius:50%;
     border:none;cursor:pointer;font-size:20px;background:rgba(255,255,255,0.9);box-shadow:0 3px 8px rgba(0,0,0,0.35);}
   #banterMute:active{transform:translateY(2px);}
@@ -229,6 +261,9 @@
     const toast = document.createElement("div");
     toast.id = "banterToast";
     document.body.appendChild(toast);
+    const turnEl = document.createElement("div");
+    turnEl.id = "banterTurn";
+    document.body.appendChild(turnEl);
     const mute = document.createElement("button");
     mute.id = "banterMute";
     mute.textContent = muted ? "🔇" : "🔊";
@@ -296,7 +331,33 @@
     inputs.forEach((inp) => inp.addEventListener("keydown", (e) => { if (e.key === "Enter") finish(); }));
   }
 
-  window.Banter = { askNames, say, sfx, loadNames, saveNames };
+  // ---------- persistent "whose turn" banner ----------
+  function textColorFor(bg) {
+    if (!bg || bg[0] !== "#") return "#fff";
+    let h = bg.slice(1); if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? "#2c3e50" : "#fff";
+  }
+  let lastTurnText = "";
+  function turn(name, color, action) {
+    ensureDom();
+    const el = document.getElementById("banterTurn");
+    const txt = "👉 " + (name || "Player") + (action ? " — " + action : "");
+    el.style.background = color || "#2c3e50";
+    el.style.color = textColorFor(color);
+    el.classList.add("show");
+    if (txt !== lastTurnText) {
+      el.textContent = txt; lastTurnText = txt;
+      el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
+    }
+  }
+  function turnClear() {
+    const el = document.getElementById("banterTurn");
+    if (el) el.classList.remove("show");
+    lastTurnText = "";
+  }
+
+  window.Banter = { askNames, say, sfx, turn, turnClear, loadNames, saveNames };
 
   // show the 🏠 home + 🔊 mute controls right away, even before a game starts
   if (document.body) ensureDom();

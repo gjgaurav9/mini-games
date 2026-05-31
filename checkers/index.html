@@ -295,9 +295,11 @@ function updateHUD() {
   tp.textContent = "▸ " + PDEF[turn].name + (mustPiece ? " — jump again!" : "'s turn");
   tp.style.background = PDEF[turn].fill; tp.style.color = turn === 1 ? "#fff" : "#2c3e50";
   document.getElementById("capPill").textContent = "Pieces  🔴 " + countPieces(1) + " – ⚪ " + countPieces(2);
+  if (state === "playing") Banter.turn(PDEF[turn].name, PDEF[turn].fill, mustPiece ? "jump again!" : "your move");
 }
 function win(player) {
   state = "won";
+  Banter.turnClear();
   document.getElementById("endTitle").textContent = "🏆 " + PDEF[player].name + " wins!";
   document.getElementById("endMsg").innerHTML = PDEF[player].name + " cleared the board (or trapped the rival). 🎉";
   Banter.say("win", PDEF[player].name);
@@ -305,6 +307,7 @@ function win(player) {
 }
 
 function backToStart() {
+  Banter.turnClear();
   endScreen.classList.add("hidden"); startScreen.classList.remove("hidden");
   document.getElementById("topbar").classList.add("hidden"); board = null; state = "idle";
 }

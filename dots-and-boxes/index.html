@@ -230,6 +230,8 @@ function updateHUD() {
   reset.id = "resetBtn"; reset.textContent = "↺ New";
   reset.addEventListener("click", backToStart);
   bar.appendChild(reset);
+  const ap = players[turnIndex];
+  if (ap) Banter.turn(ap.name, ap.fill, "draw a line");
 }
 function finish() {
   state = "won";
@@ -241,10 +243,12 @@ function finish() {
     (winners.length > 1 ? `<br>Tied on ${max} boxes.` : `<br>with ${max} boxes!`);
   if (winners.length === 1) Banter.say("win", winners[0].name);
   updateHUD();
+  Banter.turnClear();
   endScreen.classList.remove("hidden");
 }
 
 function backToStart() {
+  Banter.turnClear();
   endScreen.classList.add("hidden"); startScreen.classList.remove("hidden");
   document.getElementById("topbar").classList.add("hidden");
   boxes = null; state = "idle";

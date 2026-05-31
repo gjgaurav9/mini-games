@@ -234,9 +234,11 @@ function updateHUD() {
   const tp = document.getElementById("turnPill");
   tp.textContent = "▸ " + P[turn].name + "'s turn";
   tp.style.background = P[turn].fill; tp.style.color = turn === 1 ? "#fff" : "#5a4500";
+  Banter.turn(P[turn].name, P[turn].fill, "drop a disc");
 }
 function win(player) {
   state = "won";
+  Banter.turnClear();
   document.getElementById("endTitle").textContent = "🎉 " + P[player].name + " wins!";
   document.getElementById("endMsg").innerHTML = P[player].name + " connected four! 🏆";
   Banter.say("win", P[player].name);
@@ -244,6 +246,7 @@ function win(player) {
 }
 function tie() {
   state = "won";
+  Banter.turnClear();
   document.getElementById("endTitle").textContent = "🤝 It's a draw!";
   document.getElementById("endMsg").innerHTML = "The board is full — nobody connected four. Rematch?";
   endScreen.classList.remove("hidden");
@@ -258,12 +261,12 @@ document.getElementById("startBtn").addEventListener("click", () => {
 });
 document.getElementById("againBtn").addEventListener("click", () => {
   endScreen.classList.add("hidden"); startScreen.classList.remove("hidden");
-  document.getElementById("topbar").classList.add("hidden"); grid = null; state = "idle";
+  document.getElementById("topbar").classList.add("hidden"); Banter.turnClear(); grid = null; state = "idle";
 });
 document.getElementById("resetBtn").addEventListener("click", () => {
   if (state === "dropping") return;
   endScreen.classList.add("hidden"); startScreen.classList.remove("hidden");
-  document.getElementById("topbar").classList.add("hidden"); grid = null; state = "idle";
+  document.getElementById("topbar").classList.add("hidden"); Banter.turnClear(); grid = null; state = "idle";
 });
 
 resize();
