@@ -184,36 +184,50 @@
   };
   function sfx(name) { const fn = SFX[name]; if (fn) try { fn(); } catch (e) {} }
 
-  // ===================== SPEECH =====================
-  // Prefer a real Hindi voice (so Devanagari sounds properly Hindi, not robotic English).
-  function chooseVoice() {
-    if (!("speechSynthesis" in window)) return { voice: null, hindi: false };
-    const vs = speechSynthesis.getVoices() || [];
-    const hi = vs.find((v) => /hi[-_]IN/i.test(v.lang)) || vs.find((v) => /^hi(\b|[-_])/i.test(v.lang)) || vs.find((v) => /hindi/i.test(v.name));
-    if (hi) return { voice: hi, hindi: true };
-    const en = vs.find((v) => /en[-_]IN/i.test(v.lang)) || vs.find((v) => /^en/i.test(v.lang));
-    return { voice: en || vs[0] || null, hindi: false };
+  // ===================== SOOTHING BACKGROUND MUSIC =====================
+  // A gentle synthesized ambient loop (soft pad chords + occasional pentatonic
+  // notes) — no audio files, fully offline. Starts when a game begins.
+  let musicGain = null, musicTimer = null, musicStep = 0, musicOn = false;
+  // calm progression: C major, G, A minor, F (low, warm)
+  const PROG = [
+    [130.81, 164.81, 196.00],
+    [196.00, 246.94, 293.66],
+    [110.00, 130.81, 164.81],
+    [87.31, 110.00, 130.81],
+  ];
+  const MELODY = [523.25, 587.33, 659.25, 783.99, 880.00]; // C-pentatonic, soft & sweet
+
+  function padNote(a, f, t, dur, vol, bright) {
+    const o = a.createOscillator(); o.type = bright ? "triangle" : "sine"; o.frequency.value = f;
+    const o2 = a.createOscillator(); o2.type = "sine"; o2.frequency.value = f; o2.detune.value = 7;
+    const g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + (bright ? 0.2 : 0.9));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const lp = a.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = bright ? 2200 : 1100;
+    o.connect(g); o2.connect(g); g.connect(lp).connect(musicGain);
+    o.start(t); o2.start(t); o.stop(t + dur + 0.1); o2.stop(t + dur + 0.1);
   }
-  function stripEmoji(s) {
-    return s.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "")
-            .replace(/[←-⇿⌀-➿⬀-⯿️‍]/g, "")
-            .replace(/\s+/g, " ").trim();
+  function musicTick() {
+    if (!musicOn || muted) { musicTimer = null; return; }
+    const a = ac(); if (!a) { musicTimer = setTimeout(musicTick, 1500); return; }
+    const t = a.currentTime + 0.05;
+    const chord = PROG[musicStep % PROG.length]; musicStep++;
+    chord.forEach((f) => padNote(a, f, t, 3.6, 0.05, false));
+    if (musicStep % 2 === 0) padNote(a, MELODY[Math.floor(Math.random() * MELODY.length)], t + 0.4, 1.8, 0.035, true);
+    musicTimer = setTimeout(musicTick, 3000);
   }
-  // pair = [latinText, devanagariText]; speaks Devanagari when a Hindi voice exists, else romanized.
-  function speak(pair, name) {
-    if (muted || !("speechSynthesis" in window)) return;
-    const { voice, hindi } = chooseVoice();
-    const clean = stripEmoji((hindi ? pair[1] : pair[0]).replace(/\{name\}/g, name || "Player"));
-    if (!clean) return;
-    try {
-      speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(clean);
-      u.rate = hindi ? 0.95 : 0.98; u.pitch = 1.0; u.volume = 1;
-      if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = hindi ? "hi-IN" : "en-IN";
-      speechSynthesis.speak(u);
-    } catch (e) {}
+  function startMusic() {
+    const a = ac(); if (!a) return;
+    if (!musicGain) { musicGain = a.createGain(); musicGain.gain.value = 0.6; musicGain.connect(a.destination); }
+    if (musicOn || muted) return;
+    musicOn = true;
+    if (!musicTimer) musicTick();
   }
-  if ("speechSynthesis" in window) { try { speechSynthesis.onvoiceschanged = chooseVoice; } catch (e) {} }
+  function stopMusic() {
+    musicOn = false;
+    if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; }
+  }
 
   // ===================== DOM (toast + mute button) =====================
   const css = `
@@ -272,8 +286,8 @@
       muted = !muted;
       try { localStorage.setItem(MUTE_KEY, muted ? "1" : "0"); } catch (e) {}
       mute.textContent = muted ? "🔇" : "🔊";
-      if (muted && "speechSynthesis" in window) try { speechSynthesis.cancel(); } catch (e) {}
-      if (!muted) sfx("good");
+      if (muted) stopMusic();
+      else { sfx("good"); startMusic(); }
     });
     document.body.appendChild(mute);
     const home = document.createElement("a");
@@ -294,7 +308,6 @@
     el.classList.add("show");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.classList.remove("show"), 2700);
-    speak(pair, name || "Player");
     if (!(opts && opts.mute)) sfx(cat === "sixer" ? "six" : cat);
   }
 
@@ -321,7 +334,7 @@
     const inputs = [...modal.querySelectorAll("input")];
     if (inputs[0]) setTimeout(() => inputs[0].focus(), 50);
     function finish() {
-      ac(); // unlock audio via this gesture
+      ac(); startMusic(); // unlock audio + begin soothing background music on this gesture
       const names = inputs.map((inp, i) => (inp.value.trim() || slots[i].label).slice(0, 14));
       saveNames(names);
       modal.remove();
@@ -357,7 +370,7 @@
     lastTurnText = "";
   }
 
-  window.Banter = { askNames, say, sfx, turn, turnClear, loadNames, saveNames };
+  window.Banter = { askNames, say, sfx, turn, turnClear, startMusic, stopMusic, loadNames, saveNames };
 
   // show the 🏠 home + 🔊 mute controls right away, even before a game starts
   if (document.body) ensureDom();

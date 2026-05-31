@@ -72,18 +72,22 @@
   .connect .play { background: #f1c40f; color: #5a4500; box-shadow: 0 5px 0 #b8860b; }
   .dots .play { background: #e67e22; color: #fff; box-shadow: 0 5px 0 #b8601a; }
   .checkers .play { background: #c0392b; color: #fff; box-shadow: 0 5px 0 #7d241a; }
+  .bubble .play { background: #2b8fd6; color: #fff; box-shadow: 0 5px 0 #1f6fb2; }
+  .animal .play { background: #e84393; color: #fff; box-shadow: 0 5px 0 #b52e6f; }
+  .fireworks .play { background: #b28dff; color: #3a1f6b; box-shadow: 0 5px 0 #7e5bd0; }
   .banner {
-    background: rgba(255,255,255,0.78);
-    border-radius: 20px;
-    padding: 18px 22px;
-    margin: 0 auto 36px;
+    background: linear-gradient(135deg, #ffffff 0%, #e7f4ff 60%, #dcefe6 100%);
+    border: 2px solid #bfe3ff;
+    border-radius: 22px;
+    padding: 22px 26px;
+    margin: 0 auto 40px;
     max-width: 720px;
-    font-size: clamp(14px, 3vw, 18px);
-    color: #34495e;
-    line-height: 1.5;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    font-size: clamp(15px, 3.1vw, 20px);
+    color: #2c3e50;
+    line-height: 1.6;
+    box-shadow: 0 12px 30px rgba(33,118,174,0.18);
   }
-  .banner b { color: #2c3e50; }
+  .banner b { color: #1565c0; }
   .section-title {
     text-align: left;
     font-size: clamp(20px, 4.5vw, 28px);
@@ -104,11 +108,10 @@
     <p class="subtitle">Mini games for one shared phone — gather round like the old days. 💛</p>
 
     <div class="banner">
-      No servers, no accounts, no “add friend”. <b>Your phone is the board.</b>
-      Put it on the table, everyone sits around it, and you take turns on the same
-      screen — just like a real board game. Works offline, nothing to install.
-      <br>Pop in your names (saved on your phone) and the game cheers you on with
-      desi commentary — <i>“Kya baat {name}, maza aa gaya!”</i> 🎙️🔥
+      <b>Your phone is the board.</b> Put it on the table, everyone sits around it,
+      and you take turns on the same screen — just like a real board game.
+      Works offline, nothing to install.
+      <br>Pull up a chair, press play, and unwind — with soothing background music to set the mood. 🎶
     </div>
 
     <h2 class="section-title">🪑 Gather round — board games</h2>
@@ -184,6 +187,34 @@
         <span class="emoji">🥦</span>
         <h2>Broccoli Garden</h2>
         <p>Ben picks ripe broccoli from the garden beds — but hungry bunnies want it too! Be quick and bring the harvest home to Mom.</p>
+        <span class="play">Play ▶</span>
+      </a>
+    </div>
+
+    <h2 class="section-title">👶 For little ones (under 4)</h2>
+    <p class="section-sub">Big, simple taps — no rules, no losing, just giggles. Made for tiny hands.</p>
+    <div class="grid">
+      <a class="card bubble" href="bubble-pop/index.html">
+        <span class="emoji">🫧</span>
+        <h2>Bubble Pop</h2>
+        <p>Tap the floating bubbles to pop them with a happy little sound.</p>
+        <span class="tag">Ages 1–4</span><br>
+        <span class="play">Play ▶</span>
+      </a>
+
+      <a class="card animal" href="animal-tap/index.html">
+        <span class="emoji">🐮</span>
+        <h2>Animal Tap</h2>
+        <p>Tap the big animal to make it dance and meet a new friend each time.</p>
+        <span class="tag">Ages 1–4</span><br>
+        <span class="play">Play ▶</span>
+      </a>
+
+      <a class="card fireworks" href="tap-fireworks/index.html">
+        <span class="emoji">🎆</span>
+        <h2>Tap Fireworks</h2>
+        <p>Tap anywhere to light up the night sky with colourful sparkles.</p>
+        <span class="tag">Ages 1–4</span><br>
         <span class="play">Play ▶</span>
       </a>
     </div>

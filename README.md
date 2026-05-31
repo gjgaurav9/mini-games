@@ -27,6 +27,16 @@ Each game is a single, self-contained `index.html` (HTML5 canvas + vanilla JavaS
 | 🍌 | **[Collect Banana](collect-banana/index.html)** | Maya shakes the banana trees, catches the falling bananas, and brings the bunch home to Mom. |
 | 🥦 | **[Broccoli Garden](broccoli-collection-game/index.html)** | Ben picks ripe broccoli from the garden beds before the hungry bunnies nibble it, then brings the harvest home to Mom. |
 
+## 👶 For little ones (under 4)
+
+Big, simple taps — no rules, no losing, just giggles. Made for tiny hands.
+
+| | Game | Description |
+|---|------|-------------|
+| 🫧 | **[Bubble Pop](bubble-pop/index.html)** | Tap the floating bubbles to pop them with a happy little sound and a colourful burst. |
+| 🐮 | **[Animal Tap](animal-tap/index.html)** | Tap the big animal to make it dance with confetti; tap *Next* to meet a new friend. |
+| 🎆 | **[Tap Fireworks](tap-fireworks/index.html)** | Tap anywhere on the night sky to launch colourful fireworks. |
+
 ## Controls
 
 **Board games (pass the phone between turns):**
@@ -38,21 +48,22 @@ Each game is a single, self-contained `index.html` (HTML5 canvas + vanilla JavaS
 - **↑ / Space** — jump (Apples), shake the tree (Banana), or pick the broccoli (Broccoli Garden)
 - **Mobile** — tap the screen sides to walk, tap the middle to jump / shake / pick
 
-## Names & commentary 🎙️
+## Names, commentary, music & sound 🎶
 
 Every game asks for player **names** on the start screen (saved in your browser's
-`localStorage`, so they're pre-filled next time). During play, a shared commentary
-engine ([`shared/banter.js`](shared/banter.js)) cheers players on at big moments
-with fun **Hinglish** dialogue — captures, combos, sixes, ladders, wins and more —
+`localStorage`, so they're pre-filled next time) and shows a big colour-coded
+**"whose turn"** banner so no one gets confused. A shared module
+([`shared/banter.js`](shared/banter.js)) cheers players on at big moments with
+on-screen **Hinglish** commentary — captures, combos, sixes, ladders, wins and more —
 inspired by Sidhuisms and gully-cricket banter (*“Kya baat {name}, maza aa gaya!”*,
-*“Saanp kha gaya {name} ko!”*). It's a single self-contained module each game loads.
+*“Saanp kha gaya {name} ko!”*).
 
-The same module also adds **sound** — every line is spoken aloud (Web Speech) and
-backed by synthesized **sound effects** (dice tumble, disc drop, coin pot, snake
-chomp, ladder climb, win fanfare) made with the Web Audio API, so there are no
-audio files and it all works offline. Snakes & Ladders even **animates the snake
-biting** the token before it slides down. A 🔊/🔇 button (bottom-left) mutes both
-sound and speech, remembered per device.
+The same module adds **soothing background music** (a gentle synthesized ambient
+loop) plus **sound effects** (a real dice clatter, disc drop, coin pot, snake chomp,
+ladder climb, win fanfare) — all made with the Web Audio API, so there are no audio
+files and it works offline. The dice **visually tumbles** when rolled, and Snakes &
+Ladders **animates the snake biting** the token before it slides down. A 🔊/🔇 button
+(bottom-left) mutes the music and sound, remembered per device.
 
 ## Design idea
 

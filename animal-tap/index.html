@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🐮 Animal Tap</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; font-family: "Comic Sans MS", "Trebuchet MS", sans-serif;
+    overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: none; }
+  #game { position: relative; width: 100vw; height: 100vh; overflow: hidden;
+    transition: background .4s; background: #ffe3ec; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; }
+  #animal { font-size: clamp(120px, 42vw, 360px); line-height: 1; cursor: pointer;
+    transition: transform .08s; filter: drop-shadow(0 10px 18px rgba(0,0,0,0.2)); }
+  #name { font-size: clamp(34px, 11vw, 90px); font-weight: bold; color: #fff; margin-top: 6px;
+    text-shadow: 3px 3px 0 rgba(0,0,0,0.18); min-height: 1.1em; }
+  #next { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 6;
+    padding: 14px 34px; font-size: clamp(20px, 5vw, 30px); font-family: inherit; border: none; border-radius: 50px;
+    background: #fff; color: #e84393; cursor: pointer; box-shadow: 0 6px 0 rgba(0,0,0,0.18); }
+  #next:active { transform: translateX(-50%) translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.18); }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
+  .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; background: rgba(0,0,0,0.4); color: #fff; padding: 24px; z-index: 10; }
+  .overlay h1 { font-size: clamp(38px, 9vw, 72px); text-shadow: 3px 3px 0 #e84393; }
+  .overlay p { font-size: clamp(16px, 4vw, 24px); margin: 12px 0; }
+  .btn { margin-top: 16px; padding: 18px 46px; font-size: clamp(22px, 6vw, 36px); font-family: inherit;
+    border: none; border-radius: 50px; background: #e84393; color: #fff; cursor: pointer; box-shadow: 0 8px 0 #b52e6f; }
+  .btn:active { transform: translateY(5px); box-shadow: 0 3px 0 #b52e6f; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="canvas"></canvas>
+  <div id="animal">🐮</div>
+  <div id="name">Cow</div>
+  <button id="next" class="hidden">🔀 Next animal</button>
+  <div id="startScreen" class="overlay">
+    <h1>🐮 Animal Tap</h1>
+    <p>Tap the animal to make it dance! 🎉</p>
+    <button class="btn" id="startBtn">Play ▶</button>
+  </div>
+</div>
+<script src="../shared/banter.js"></script>
+<script>
+const ANIMALS = [
+  ["🐮", "Cow", "#fde2e4"], ["🐶", "Dog", "#cdeffd"], ["🐱", "Cat", "#ffe6c9"],
+  ["🐸", "Frog", "#d7f5cf"], ["🦁", "Lion", "#ffeec2"], ["🐧", "Penguin", "#d6eaff"],
+  ["🐰", "Bunny", "#f3e1ff"], ["🐷", "Pig", "#ffe0ef"], ["🐵", "Monkey", "#f0e2c8"],
+  ["🐔", "Hen", "#fff3cf"], ["🦆", "Duck", "#e6f6ff"], ["🐘", "Elephant", "#e7e7f6"],
+  ["🦒", "Giraffe", "#fff0c4"], ["🐠", "Fish", "#cdf3ff"], ["🐝", "Bee", "#fff6c0"],
+];
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let DPR = Math.min(window.devicePixelRatio || 1, 2), W, H;
+function resize() { DPR = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = (W = canvas.clientWidth) * DPR; canvas.height = (H = canvas.clientHeight) * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+window.addEventListener("resize", resize); resize();
+
+const animalEl = document.getElementById("animal");
+const nameEl = document.getElementById("name");
+const game = document.getElementById("game");
+let idx = 0, confetti = [];
+
+function show(i) {
+  idx = (i + ANIMALS.length) % ANIMALS.length;
+  const [emoji, name, bg] = ANIMALS[idx];
+  animalEl.textContent = emoji; nameEl.textContent = name; game.style.background = bg;
+}
+function bounce() {
+  animalEl.animate(
+    [{ transform: "scale(1) rotate(0)" }, { transform: "scale(1.25) rotate(-8deg)" },
+     { transform: "scale(0.92) rotate(6deg)" }, { transform: "scale(1) rotate(0)" }],
+    { duration: 420, easing: "ease-out" });
+  Banter.sfx(["box", "six", "great", "pot"][Math.floor(Math.random() * 4)]);
+  burst();
+}
+function burst() {
+  const cx = W / 2, cy = H * 0.42;
+  const cols = ["#ff7eb9", "#7afcff", "#feff9c", "#ff9a76", "#b28dff", "#8effa0"];
+  for (let i = 0; i < 22; i++) { const a = Math.random() * Math.PI * 2, s = 3 + Math.random() * 6;
+    confetti.push({ x: cx, y: cy, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 3, r: 4 + Math.random() * 6,
+      life: 1, color: cols[Math.floor(Math.random() * cols.length)] }); }
+}
+animalEl.addEventListener("pointerdown", bounce);
+document.getElementById("next").addEventListener("click", () => { show(idx + 1); bounce(); });
+
+function loop() {
+  ctx.clearRect(0, 0, W, H);
+  confetti = confetti.filter((p) => p.life > 0);
+  for (const p of confetti) { p.x += p.vx; p.y += p.vy; p.vy += 0.22; p.life -= 0.018;
+    ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, p.r, p.r); ctx.globalAlpha = 1; }
+  requestAnimationFrame(loop);
+}
+
+document.getElementById("startBtn").addEventListener("click", () => {
+  document.getElementById("startScreen").classList.add("hidden");
+  document.getElementById("next").classList.remove("hidden");
+  if (window.Banter) Banter.startMusic();
+  show(0);
+});
+loop();
+</script>
+</body>
+</html>
