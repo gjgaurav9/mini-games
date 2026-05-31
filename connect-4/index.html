@@ -145,6 +145,7 @@ function settleDrop() {
   const { col, row, player } = drop;
   grid[row][col] = player;
   drop = null;
+  Banter.sfx("drop");
   const line = checkWin(row, col, player);
   if (line) { winLine = line; return win(player); }
   if (grid[0].every((v) => v !== 0)) return tie();

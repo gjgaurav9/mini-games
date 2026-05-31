@@ -147,6 +147,7 @@ canvas.addEventListener("pointerdown", (e) => {
   if (!edge) return;
   if (edge.kind === "h") hE[edge.r][edge.c] = true; else vE[edge.r][edge.c] = true;
   lastEdge = edge;
+  Banter.sfx("click");
 
   // which boxes might have just been completed?
   let claimed = 0;

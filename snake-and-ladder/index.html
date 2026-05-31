@@ -162,6 +162,7 @@ let players = [], turnIndex = 0, state = "idle";
 let pendingPlayers = 2;
 let anim = null;          // {fromN,toN,t,dur,kind}
 let segQueue = [];        // upcoming {to,kind}
+let biteFx = null;        // {head, t, dur} snake-bite animation
 let lastRoll = 0, rolledSix = false;
 let diceAnimUntil = 0, rollMsg = "Tap the dice to roll 🎲";
 
@@ -229,6 +230,7 @@ function rollDice() {
   state = "rolling";
   diceAnimUntil = Date.now() + 650;
   rollMsg = "Rolling…";
+  Banter.sfx("dice");
   diceEl.classList.add("disabled");
   updateHUD();
 }
@@ -261,12 +263,14 @@ function startSegment() {
     fromN: p.pos, toN: seg.to, kind: seg.kind, t: 0,
     dur: seg.kind === "step" ? 14 : 26,
   };
+  if (anim.kind === "snake") { biteFx = { head: anim.fromN, t: 0, dur: anim.dur }; Banter.sfx("bite"); }
+  else if (anim.kind === "ladder") Banter.sfx("ladder");
 }
 function finishSegment() {
   const p = players[turnIndex];
   p.pos = anim.toN;
-  if (anim.kind === "snake") { rollMsg = p.name + " hit a snake! 🐍 down to " + p.pos; Banter.say("unlucky", p.name); }
-  else if (anim.kind === "ladder") { rollMsg = p.name + " climbed a ladder! 🪜 up to " + p.pos; Banter.say("great", p.name); }
+  if (anim.kind === "snake") { rollMsg = p.name + " hit a snake! 🐍 down to " + p.pos; Banter.sfx("snake"); Banter.say("unlucky", p.name, { mute: true }); }
+  else if (anim.kind === "ladder") { rollMsg = p.name + " climbed a ladder! 🪜 up to " + p.pos; Banter.say("great", p.name, { mute: true }); }
   anim = null;
   if (p.pos === 100) { p.finished = true; return win(p); }
   if (segQueue.length === 0) endTurn();
@@ -367,6 +371,8 @@ function drawSnakes() {
     ctx.fillStyle = "#000";
     ctx.beginPath(); ctx.arc(head.x - cell * 0.07, head.y - cell * 0.05, cell * 0.022, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(head.x + cell * 0.07, head.y - cell * 0.05, cell * 0.022, 0, Math.PI * 2); ctx.fill();
+    if (biteFx && biteFx.head === +from)
+      drawBite(head.x, head.y, Math.atan2(tail.y - head.y, tail.x - head.x), biteFx.t / biteFx.dur);
   }
 }
 
@@ -401,6 +407,32 @@ function update() {
       if (anim.t >= anim.dur) finishSegment();
     }
   }
+  if (biteFx) { biteFx.t++; if (biteFx.t >= biteFx.dur) biteFx = null; }
+}
+
+function drawBite(hx, hy, ang, prog) {
+  const open = Math.abs(Math.sin(prog * Math.PI * 3)) * 0.7 + 0.06; // chomping jaw gap
+  const R = cell * 0.32 * (1 + 0.18 * Math.sin(prog * Math.PI));
+  const shake = (1 - prog) * cell * 0.06 * Math.sin(prog * Math.PI * 12);
+  ctx.save();
+  ctx.translate(hx + shake, hy);
+  ctx.rotate(ang);
+  // mouth interior
+  ctx.fillStyle = "#7d1a1a";
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, -open, open); ctx.closePath(); ctx.fill();
+  // head / jaws
+  ctx.fillStyle = "#1e8449";
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, open, Math.PI * 2 - open); ctx.closePath(); ctx.fill();
+  // fangs
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.moveTo(R * 0.95, -R * 0.08); ctx.lineTo(R * 0.45, -R * 0.02); ctx.lineTo(R * 0.55, -R * 0.28); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(R * 0.95, R * 0.08); ctx.lineTo(R * 0.45, R * 0.02); ctx.lineTo(R * 0.55, R * 0.28); ctx.closePath(); ctx.fill();
+  // eyes
+  ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(-R * 0.15, -R * 0.5, R * 0.18, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(-R * 0.15, R * 0.5, R * 0.18, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(-R * 0.1, -R * 0.5, R * 0.08, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(-R * 0.1, R * 0.5, R * 0.08, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
 }
 
 function tokenLogicalSpot(p, i) {
@@ -424,6 +456,7 @@ function draw() {
       const tx = to.x + o.dx, ty = to.y + o.dy;
       const k = easeInOut(Math.min(1, anim.t / anim.dur));
       p.ax = fx + (tx - fx) * k; p.ay = fy + (ty - fy) * k;
+      if (anim.kind === "snake") p.ax += Math.sin(k * Math.PI * 5) * cell * 0.18; // slither
       const lift = anim.kind === "step" ? Math.sin(k * Math.PI) * cell * 0.3 : 0;
       drawToken(p, i, lift);
     } else {

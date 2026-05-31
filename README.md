@@ -47,6 +47,13 @@ with fun **Hinglish** dialogue — captures, combos, sixes, ladders, wins and mo
 inspired by Sidhuisms and gully-cricket banter (*“Kya baat {name}, maza aa gaya!”*,
 *“Saanp kha gaya {name} ko!”*). It's a single self-contained module each game loads.
 
+The same module also adds **sound** — every line is spoken aloud (Web Speech) and
+backed by synthesized **sound effects** (dice tumble, disc drop, coin pot, snake
+chomp, ladder climb, win fanfare) made with the Web Audio API, so there are no
+audio files and it all works offline. Snakes & Ladders even **animates the snake
+biting** the token before it slides down. A 🔊/🔇 button (bottom-left) mutes both
+sound and speech, remembered per device.
+
 ## Design idea
 
 This collection is built around **local, offline, pass-and-play** fun: everyone sits together around a single phone instead of each playing alone on their own device and connecting to a server. The constraints (one screen, no backend) are the point — it's zero-friction and brings back the feeling of a real board game night.

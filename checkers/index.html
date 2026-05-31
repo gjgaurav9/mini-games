@@ -178,6 +178,7 @@ function doMove(move) {
   const piece = board[move.fromR][move.fromC];
   board[move.fromR][move.fromC] = null;
   const from = sq(move.fromC, move.fromR), to = sq(move.toC, move.toR);
+  Banter.sfx(move.cap ? "strike" : "click");
   anim = { fromXY: from, toXY: to, t: 0, dur: 10, piece, move };
 }
 

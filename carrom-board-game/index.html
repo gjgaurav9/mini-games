@@ -353,6 +353,7 @@ function shoot() {
   if (!v) return;
   striker.vx = v.vx; striker.vy = v.vy;
   shotPots = { white: 0, black: 0, queen: false, striker: false };
+  Banter.sfx("strike");
   state = "moving";
 }
 
@@ -391,7 +392,7 @@ function checkPocket(p) {
 }
 
 let pots = [];
-function potFx(x, y) { pots.push({ x, y, life: 1 }); }
+function potFx(x, y) { pots.push({ x, y, life: 1 }); Banter.sfx("pot"); }
 
 function step() {
   const all = [striker, ...pieces.filter(p => p.active)];

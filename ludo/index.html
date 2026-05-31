@@ -229,7 +229,7 @@ function setDiceFace(f) { dots.forEach((d, i) => d.classList.toggle("s", f > 0 &
 function rollDice() {
   if (state !== "ready") return;
   state = "rolling"; diceUntil = Date.now() + 600;
-  rollMsg = "Rolling…"; diceEl.classList.add("disabled"); updateHUD();
+  rollMsg = "Rolling…"; Banter.sfx("dice"); diceEl.classList.add("disabled"); updateHUD();
 }
 function finishRoll() {
   lastRoll = 1 + Math.floor(Math.random() * 6);
