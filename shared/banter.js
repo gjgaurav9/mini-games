@@ -25,63 +25,64 @@
   let muted = false;
   try { muted = localStorage.getItem(MUTE_KEY) === "1"; } catch (e) {}
 
-  // ---------- commentary bank (Hinglish, inspired by Sidhuisms + gully-cricket banter) ----------
+  // ---------- commentary bank (Hinglish): [ toast text (Latin), spoken text (Devanagari) ] ----------
+  // Latin is shown on screen; the Devanagari is what a hi-IN voice speaks, so it sounds properly Hindi.
   const LINES = {
     start: [
-      "Chalo {name}, dikhao apna jalwa!",
-      "All the best {name} — khul ke khel!",
-      "{name} ki baari — pressure mat lena, maza lena!",
-      "Aa gaya apna champion {name}!",
+      ["Chalo {name}, dikhao apna jalwa!", "चलो {name}, दिखाओ अपना जलवा!"],
+      ["All the best {name} — khul ke khel!", "ऑल द बेस्ट {name}, खुल के खेल!"],
+      ["{name} ki baari — pressure mat lena, maza lena!", "{name} की बारी, प्रेशर मत लेना, मज़ा लेना!"],
+      ["Aa gaya apna champion {name}!", "आ गया अपना चैंपियन {name}!"],
     ],
     good: [
-      "Shabash {name}!",
-      "Wah {name}, badhiya chaal!",
-      "Nice {name} — aise hi chalte reh!",
-      "{name} warming up ho raha hai!",
-      "Solid {name}! Control toh dekho.",
-      "Theek thaak {name}, lage raho!",
+      ["Shabash {name}!", "शाबाश {name}!"],
+      ["Wah {name}, badhiya chaal!", "वाह {name}, बढ़िया चाल!"],
+      ["Nice {name} — aise hi chalte reh!", "नाइस {name}, ऐसे ही चलते रह!"],
+      ["{name} warming up ho raha hai!", "{name} वॉर्मिंग अप हो रहा है!"],
+      ["Solid {name}! Control toh dekho.", "सॉलिड {name}! कंट्रोल तो देखो।"],
+      ["Theek thaak {name}, lage raho!", "ठीक ठाक {name}, लगे रहो!"],
     ],
     great: [
-      "Kya baat {name}! Maza aa gaya!",
-      "Arre {name}, kya khel raha hai bhai!",
-      "{name} ne maara tracer bullet!",
-      "{name} on fire! Pura cycle-stand gir gaya!",
-      "Laajawaab {name}! Crowd pagal ho gayi!",
-      "Wah wah {name}! Ye hui na baat!",
-      "Haaye {name}, dil jeet liya!",
+      ["Kya baat {name}! Maza aa gaya!", "क्या बात {name}! मज़ा आ गया!"],
+      ["Arre {name}, kya khel raha hai bhai!", "अरे {name}, क्या खेल रहा है भाई!"],
+      ["{name} ne maara tracer bullet!", "{name} ने मारा ट्रेसर बुलेट!"],
+      ["{name} on fire! Pura cycle-stand gir gaya!", "{name} ऑन फ़ायर! पूरा साइकिल स्टैंड गिर गया!"],
+      ["Laajawaab {name}! Crowd pagal ho gayi!", "लाजवाब {name}! क्राउड पागल हो गई!"],
+      ["Wah wah {name}! Ye hui na baat!", "वाह वाह {name}! ये हुई ना बात!"],
+      ["Haaye {name}, dil jeet liya!", "हाय {name}, दिल जीत लिया!"],
     ],
     capture: [
-      "Ouch! {name} ne dho daala!",
-      "{name} ne seedha ghar bhej diya — bye bye!",
-      "Daring {name}! Kya shikaar hai!",
-      "{name} ka attack! Sambhalo apne aap ko!",
-      "Rok lo isko — {name} bhaari pad raha hai!",
+      ["Ouch! {name} ne dho daala!", "ओह! {name} ने धो डाला!"],
+      ["{name} ne seedha ghar bhej diya — bye bye!", "{name} ने सीधा घर भेज दिया, बाय बाय!"],
+      ["Daring {name}! Kya shikaar hai!", "डेयरिंग {name}! क्या शिकार है!"],
+      ["{name} ka attack! Sambhalo apne aap ko!", "{name} का अटैक! संभालो अपने आप को!"],
+      ["Rok lo isko — {name} bhaari pad raha hai!", "रोक लो इसको, {name} भारी पड़ रहा है!"],
     ],
     combo: [
-      "Double dhamaka {name}!",
-      "{name} ek ke baad ek — rok hi nahi raha!",
-      "Combo king {name}! Dimaag ghoom gaya!",
-      "Hat-trick wali feeling {name}!",
+      ["Double dhamaka {name}!", "डबल धमाका {name}!"],
+      ["{name} ek ke baad ek — rok hi nahi raha!", "{name} एक के बाद एक, रुक ही नहीं रहा!"],
+      ["Combo king {name}! Dimaag ghoom gaya!", "कॉम्बो किंग {name}! दिमाग़ घूम गया!"],
+      ["Hat-trick wali feeling {name}!", "हैट ट्रिक वाली फ़ीलिंग {name}!"],
     ],
     sixer: [
-      "Chhakka! {name} rolls a six!",
-      "{name} ko mila six — ek aur baari, lucky!",
-      "Sixer {name}! Phir se phenk, kismat saath hai!",
-      "Chhe aaya {name}! Aag laga di!",
+      ["Chhakka! {name} rolls a six!", "छक्का! {name} ने फेंका छह!"],
+      ["{name} ko mila six — ek aur baari, lucky!", "{name} को मिला छह, एक और बारी, लकी!"],
+      ["Sixer {name}! Phir se phenk, kismat saath hai!", "सिक्सर {name}! फिर से फेंक, किस्मत साथ है!"],
+      ["Chhe aaya {name}! Aag laga di!", "छह आया {name}! आग लगा दी!"],
     ],
     unlucky: [
-      "Oof {name}, bad luck! Aisa hota hai.",
-      "Arre {name}, sambhal ke — tension mat le.",
-      "Saanp kha gaya {name} ko! Wapas neeche!",
-      "Thoda ulta pad gaya {name}, koi na — agli baari pakki!",
-      "Itni si baat pe? Wapas khade ho jao {name}!",
+      ["Oof {name}, bad luck! Aisa hota hai.", "ओफ़ {name}, बैड लक! ऐसा होता है।"],
+      ["Arre {name}, sambhal ke — tension mat le.", "अरे {name}, संभल के, टेंशन मत ले।"],
+      ["Saanp kha gaya {name} ko! Wapas neeche!", "साँप खा गया {name} को! वापस नीचे!"],
+      ["Thoda ulta pad gaya {name}, koi na — agli baari pakki!", "थोड़ा उल्टा पड़ गया {name}, कोई ना, अगली बारी पक्की!"],
+      ["Itni si baat pe? Wapas khade ho jao {name}!", "इतनी सी बात पे? वापस खड़े हो जाओ {name}!"],
     ],
     win: [
-      "{name} is the champion! Kya khela, kya khela!",
-      "Game, set, match — {name}! Maza aa gaya!",
-      "{name} ne baazi maar li! Crowd on its feet!",
-      "Take a bow {name}! Aaj ka hero!",
-      "{name} ne kar dikhaya! Itihaas ban gaya!",
+      ["{name} is the champion! Kya khela, kya khela!", "{name} इज़ द चैंपियन! क्या खेला, क्या खेला!"],
+      ["Game, set, match — {name}! Maza aa gaya!", "गेम सेट मैच, {name}! मज़ा आ गया!"],
+      ["{name} ne baazi maar li! Crowd on its feet!", "{name} ने बाज़ी मार ली! क्राउड ऑन इट्स फ़ीट!"],
+      ["Take a bow {name}! Aaj ka hero!", "टेक अ बाउ {name}! आज का हीरो!"],
+      ["{name} ne kar dikhaya! Itihaas ban gaya!", "{name} ने कर दिखाया! इतिहास बन गया!"],
     ],
   };
   // emoji to prepend in the toast (speech reads the clean text only)
@@ -160,30 +161,35 @@
   function sfx(name) { const fn = SFX[name]; if (fn) try { fn(); } catch (e) {} }
 
   // ===================== SPEECH =====================
-  function pickVoice() {
-    if (!("speechSynthesis" in window)) return null;
+  // Prefer a real Hindi voice (so Devanagari sounds properly Hindi, not robotic English).
+  function chooseVoice() {
+    if (!("speechSynthesis" in window)) return { voice: null, hindi: false };
     const vs = speechSynthesis.getVoices() || [];
-    return vs.find((v) => /en[-_]IN/i.test(v.lang)) || vs.find((v) => /hi[-_]IN/i.test(v.lang)) ||
-           vs.find((v) => /^en/i.test(v.lang)) || vs[0] || null;
+    const hi = vs.find((v) => /hi[-_]IN/i.test(v.lang)) || vs.find((v) => /^hi(\b|[-_])/i.test(v.lang)) || vs.find((v) => /hindi/i.test(v.name));
+    if (hi) return { voice: hi, hindi: true };
+    const en = vs.find((v) => /en[-_]IN/i.test(v.lang)) || vs.find((v) => /^en/i.test(v.lang));
+    return { voice: en || vs[0] || null, hindi: false };
   }
   function stripEmoji(s) {
     return s.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "")
             .replace(/[←-⇿⌀-➿⬀-⯿️‍]/g, "")
             .replace(/\s+/g, " ").trim();
   }
-  function speak(text) {
+  // pair = [latinText, devanagariText]; speaks Devanagari when a Hindi voice exists, else romanized.
+  function speak(pair, name) {
     if (muted || !("speechSynthesis" in window)) return;
-    const clean = stripEmoji(text);
+    const { voice, hindi } = chooseVoice();
+    const clean = stripEmoji((hindi ? pair[1] : pair[0]).replace(/\{name\}/g, name || "Player"));
     if (!clean) return;
     try {
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(clean);
-      u.rate = 1.06; u.pitch = 1.05; u.volume = 1;
-      const v = pickVoice(); if (v) { u.voice = v; u.lang = v.lang; }
+      u.rate = hindi ? 0.95 : 0.98; u.pitch = 1.0; u.volume = 1;
+      if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = hindi ? "hi-IN" : "en-IN";
       speechSynthesis.speak(u);
     } catch (e) {}
   }
-  if ("speechSynthesis" in window) { try { speechSynthesis.onvoiceschanged = pickVoice; } catch (e) {} }
+  if ("speechSynthesis" in window) { try { speechSynthesis.onvoiceschanged = chooseVoice; } catch (e) {} }
 
   // ===================== DOM (toast + mute button) =====================
   const css = `
@@ -246,13 +252,14 @@
   let toastTimer = null;
   function say(cat, name, opts) {
     ensureDom();
-    const line = pick(cat).replace(/\{name\}/g, name || "Player");
+    const pair = pick(cat);
+    const latin = pair[0].replace(/\{name\}/g, name || "Player");
     const el = document.getElementById("banterToast");
-    el.textContent = (EMOJI[cat] ? EMOJI[cat] + " " : "") + line;
+    el.textContent = (EMOJI[cat] ? EMOJI[cat] + " " : "") + latin;
     el.classList.add("show");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.classList.remove("show"), 2700);
-    speak(line);
+    speak(pair, name || "Player");
     if (!(opts && opts.mute)) sfx(cat === "sixer" ? "six" : cat);
   }
 
