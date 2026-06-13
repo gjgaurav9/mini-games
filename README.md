@@ -19,6 +19,16 @@ Each game is a single, self-contained `index.html` (HTML5 canvas + vanilla JavaS
 | ⬛ | **[Dots & Boxes](dots-and-boxes/index.html)** | 2–4 players, choose grid size. Draw one line per turn; close the fourth side of a box to claim it and go again. Most boxes wins. |
 | ♟️ | **[Checkers](checkers/index.html)** | 2 players. Diagonal moves, compulsory captures, multi-jumps and King promotion. Take all the rival's pieces (or leave them with no move) to win. |
 
+## ⚡ Dobble — head-to-head spot it! (2 players, one device)
+
+Lay the phone flat between you (each player's card faces them). Every two cards share **exactly ONE** matching picture — be the first to spot it and tap it on your card to score. A wrong tap freezes you for a moment. First to 7 wins. The decks use a projective-plane layout, so any two cards always share precisely one symbol.
+
+| | Game | Description |
+|---|------|-------------|
+| 🦁 | **[Dobble Safari](dobble-animals/index.html)** | 6 animals per card. Spot the one creature you both share and tap it first. |
+| 🍔 | **[Dobble Feast](dobble-food/index.html)** | 6 foods per card — fruits, snacks and treats. Grab the matching bite before your rival. |
+| ⚡ | **[Dobble Classic](dobble-classic/index.html)** | The full pack — 8 mixed symbols per card. Harder to scan, easier to fumble. |
+
 ## 🕹️ Quick solo play
 
 | | Game | Description |

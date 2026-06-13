@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>🍔 Dobble Feast — Spot It Face-Off</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    font-family: "Comic Sans MS", "Trebuchet MS", sans-serif;
+    background: linear-gradient(160deg, #ffe9a8 0%, #ffc97a 50%, #f59e5c 100%);
+    color: #2c3e50;
+    -webkit-user-select: none; user-select: none;
+    touch-action: none;
+  }
+  #board {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+  }
+  .half {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: space-evenly;
+    padding: 6px 0;
+  }
+  .half.top { transform: rotate(180deg); }
+  .hud {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: bold; font-size: clamp(15px, 4vw, 22px);
+    background: rgba(255,255,255,0.82);
+    padding: 5px 16px; border-radius: 30px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.18);
+    max-width: 92vw; white-space: nowrap;
+  }
+  .hud .pname { overflow: hidden; text-overflow: ellipsis; max-width: 38vw; }
+  .pips { letter-spacing: 2px; font-size: 0.8em; }
+  .cardWrap { position: relative; }
+  .card {
+    position: relative;
+    width: min(86vw, 38dvh);
+    height: min(86vw, 38dvh);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffffff 0%, #fdf6e3 70%, #f3e7c4 100%);
+    border: 5px solid rgba(255,255,255,0.95);
+    box-shadow: 0 10px 26px rgba(0,0,0,0.28), inset 0 0 0 3px rgba(0,0,0,0.06);
+    transition: transform .3s ease, opacity .3s, filter .2s;
+  }
+  .card.dealing { transform: scale(0) rotate(-180deg); opacity: 0; }
+  .card.locked { filter: grayscale(0.8) brightness(0.8); }
+  @keyframes shake {
+    0%,100% { margin-left: 0; } 20% { margin-left: -10px; }
+    40% { margin-left: 10px; } 60% { margin-left: -7px; } 80% { margin-left: 7px; }
+  }
+  .card.shake { animation: shake .4s; }
+  .sym {
+    position: absolute;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform .15s;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.18));
+  }
+  .sym:active { transform: scale(1.15); }
+  @keyframes hitPulse {
+    0% { transform: scale(1); } 50% { transform: scale(1.45); } 100% { transform: scale(1.25); }
+  }
+  .sym.hit {
+    animation: hitPulse .5s ease-out forwards;
+    filter: drop-shadow(0 0 10px #2ecc71) drop-shadow(0 0 18px #2ecc71);
+    z-index: 5;
+  }
+  .divider {
+    flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    font-weight: bold; font-size: clamp(12px, 3vw, 16px);
+    color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    background: rgba(44,62,80,0.55);
+    padding: 3px 0; width: 100%;
+  }
+  .overlay {
+    position: fixed; inset: 0; z-index: 70;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.66); padding: 20px;
+  }
+  .panel {
+    background: #fff; border-radius: 26px; padding: 26px 24px;
+    max-width: 440px; width: 100%; text-align: center;
+    box-shadow: 0 18px 48px rgba(0,0,0,0.5);
+  }
+  .panel h1 { font-size: clamp(26px, 6vw, 38px); margin-bottom: 8px; }
+  .panel .big { font-size: clamp(54px, 14vw, 90px); line-height: 1.1; }
+  .panel p { font-size: clamp(14px, 3.4vw, 17px); color: #5d6d7e; margin: 10px 0; line-height: 1.5; }
+  .panel .go {
+    margin-top: 14px; width: 100%; padding: 14px; border: none; border-radius: 16px;
+    font-family: inherit; font-size: clamp(18px, 4.5vw, 23px); cursor: pointer;
+    background: #e67e22; color: #fff; box-shadow: 0 5px 0 #b8601a; font-weight: bold;
+  }
+  .panel .go:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8601a; }
+  #countdown {
+    position: fixed; inset: 0; z-index: 65; display: none;
+    align-items: center; justify-content: center; pointer-events: none;
+    font-size: clamp(90px, 28vw, 200px); font-weight: bold; color: #fff;
+    text-shadow: 0 6px 24px rgba(0,0,0,0.5);
+  }
+</style>
+</head>
+<body>
+<div id="board">
+  <div class="half top">
+    <div class="hud"><span class="pname" id="name2">Player 2</span><span class="pips" id="pips2"></span></div>
+    <div class="cardWrap"><div class="card dealing" id="card2"></div></div>
+  </div>
+  <div class="divider"><span id="roundLbl">Spot the ONE matching food — tap it on YOUR card!</span></div>
+  <div class="half bottom">
+    <div class="cardWrap"><div class="card dealing" id="card1"></div></div>
+    <div class="hud"><span class="pname" id="name1">Player 1</span><span class="pips" id="pips1"></span></div>
+  </div>
+</div>
+<div id="countdown"></div>
+<div class="overlay" id="overlay" style="display:none"><div class="panel" id="panel"></div></div>
+
+<script src="../shared/banter.js"></script>
+<script>
+"use strict";
+// ============ THEME CONFIG (the only part that differs between Dobble games) ============
+const CFG = {
+  emoji: "🍔",
+  title: "Dobble Feast",
+  matchWord: "food",
+  n: 5, // projective-plane order → 6 symbols per card, 31 cards
+  symbols: ["🍎","🍌","🍇","🍉","🍓","🍒","🍍","🥭","🍑","🍋","🥝","🥕","🌽","🥦","🍅","🍆","🥑","🍞","🧀","🍕","🍔","🌮","🍟","🍩","🍪","🎂","🍦","🍫","🍿","🥨","🍭"],
+  symScale: 0.20, // symbol size as a fraction of card diameter
+  target: 7,      // points to win
+  p1: { label: "Player 1", color: "#e74c3c" },
+  p2: { label: "Player 2", color: "#2b8fd6" },
+};
+// =========================================================================================
+
+// ---- Dobble deck: projective plane of order n. Every pair of cards shares EXACTLY one symbol. ----
+function buildDeck(n) {
+  const cards = [];
+  for (let m = 0; m < n; m++)
+    for (let b = 0; b < n; b++) {
+      const card = [n * n + m];
+      for (let x = 0; x < n; x++) card.push(x * n + ((m * x + b) % n));
+      cards.push(card);
+    }
+  for (let b = 0; b < n; b++) {
+    const card = [n * n + n];
+    for (let y = 0; y < n; y++) card.push(b * n + y);
+    cards.push(card);
+  }
+  cards.push(Array.from({ length: n + 1 }, (_, i) => n * n + i));
+  return cards;
+}
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+const deckBase = buildDeck(CFG.n);
+let deck = [], deckPos = 0;
+let names = [CFG.p1.label, CFG.p2.label];
+let score = [0, 0];
+let cardA = null, cardB = null, shared = -1;
+let roundLive = false, lock = [false, false];
+let streakWho = -1, streak = 0;
+
+const el = (id) => document.getElementById(id);
+const cardEls = [el("card1"), el("card2")];
+
+// ---- layout: slot positions (percent of card) for the symbols on a card ----
+function ring(k, r) {
+  const a0 = Math.random() * 360;
+  return Array.from({ length: k }, (_, i) => {
+    const a = ((a0 + (i * 360) / k) * Math.PI) / 180;
+    return { x: 50 + r * Math.cos(a) + (Math.random() * 6 - 3), y: 50 + r * Math.sin(a) + (Math.random() * 6 - 3) };
+  });
+}
+function slots(count) {
+  if (count <= 6) return shuffle([{ x: 50, y: 50 }, ...ring(count - 1, 31)]);
+  return shuffle([...ring(count - 2, 34), ...ring(2, 13)]);
+}
+
+function renderCard(who) {
+  const elc = cardEls[who];
+  const card = who === 0 ? cardA : cardB;
+  elc.innerHTML = "";
+  const sl = slots(card.length);
+  const base = elc.clientWidth * CFG.symScale;
+  card.forEach((sym, i) => {
+    const d = document.createElement("div");
+    d.className = "sym";
+    d.textContent = CFG.symbols[sym];
+    const rot = Math.random() * 70 - 35;
+    const sc = 0.82 + Math.random() * 0.42;
+    d.style.left = sl[i].x + "%";
+    d.style.top = sl[i].y + "%";
+    d.style.fontSize = Math.round(base * sc) + "px";
+    d.style.transform = `translate(-50%,-50%) rotate(${rot}deg)`;
+    d.style.marginLeft = "0"; // keep shake anim from moving symbols
+    d.dataset.sym = sym;
+    d.addEventListener("pointerdown", (e) => { e.preventDefault(); onTap(who, sym, d); });
+    elc.appendChild(d);
+  });
+}
+
+function updateHUD() {
+  el("name1").textContent = names[0];
+  el("name2").textContent = names[1];
+  el("name1").style.color = CFG.p1.color;
+  el("name2").style.color = CFG.p2.color;
+  for (const [i, id] of [[0, "pips1"], [1, "pips2"]]) {
+    el(id).textContent = "●".repeat(score[i]) + "○".repeat(Math.max(0, CFG.target - score[i]));
+    el(id).style.color = i === 0 ? CFG.p1.color : CFG.p2.color;
+  }
+}
+
+function deal() {
+  if (deckPos + 2 > deck.length) { deck = shuffle(deckBase.slice()); deckPos = 0; }
+  cardA = deck[deckPos++];
+  cardB = deck[deckPos++];
+  shared = cardA.find((s) => cardB.includes(s));
+  cardEls.forEach((c) => c.classList.add("dealing"));
+  setTimeout(() => {
+    renderCard(0); renderCard(1);
+    cardEls.forEach((c) => { c.classList.remove("dealing", "locked", "shake"); });
+    Banter.sfx("drop");
+    lock = [false, false];
+    roundLive = true;
+  }, 320);
+}
+
+function onTap(who, sym, dEl) {
+  if (!roundLive || lock[who]) return;
+  if (sym === shared) {
+    roundLive = false;
+    score[who]++;
+    updateHUD();
+    // light up the match on BOTH cards
+    cardEls.forEach((c) =>
+      c.querySelectorAll(".sym").forEach((s) => { if (+s.dataset.sym === shared) s.classList.add("hit"); }));
+    Banter.sfx("pot");
+    if (streakWho === who) streak++; else { streakWho = who; streak = 1; }
+    if (score[who] >= CFG.target) { setTimeout(() => win(who), 900); return; }
+    if (streak === 3) Banter.say("combo", names[who]);
+    else if (Math.random() < 0.45) Banter.say(Math.random() < 0.5 ? "great" : "good", names[who]);
+    setTimeout(deal, 950);
+  } else {
+    // wrong picture: short freeze for that player
+    lock[who] = true;
+    Banter.sfx("unlucky");
+    const c = cardEls[who];
+    c.classList.add("locked", "shake");
+    setTimeout(() => { lock[who] = false; c.classList.remove("locked", "shake"); }, 1100);
+  }
+}
+
+function win(who) {
+  roundLive = false;
+  Banter.turnClear();
+  Banter.say("win", names[who]);
+  const p = el("panel");
+  p.innerHTML =
+    `<div class="big">🏆</div>
+     <h1 style="color:${who === 0 ? CFG.p1.color : CFG.p2.color}">${names[who]} wins!</h1>
+     <p>${score[0]} — ${score[1]} &nbsp;·&nbsp; Sharpest eyes at the table! ${CFG.emoji}</p>
+     <button class="go" id="againBtn">Rematch 🔄</button>`;
+  el("overlay").style.display = "flex";
+  el("againBtn").addEventListener("click", () => {
+    el("overlay").style.display = "none";
+    startMatch();
+  });
+}
+
+function countdown(cb) {
+  const cd = el("countdown");
+  cd.style.display = "flex";
+  const steps = ["3", "2", "1", "GO!"];
+  let i = 0;
+  (function tick() {
+    cd.textContent = steps[i];
+    Banter.sfx(i < 3 ? "click" : "start");
+    i++;
+    if (i < steps.length) setTimeout(tick, 700);
+    else setTimeout(() => { cd.style.display = "none"; cb(); }, 550);
+  })();
+}
+
+function startMatch() {
+  score = [0, 0];
+  streak = 0; streakWho = -1;
+  deck = shuffle(deckBase.slice());
+  deckPos = 0;
+  updateHUD();
+  cardEls.forEach((c) => { c.classList.add("dealing"); c.innerHTML = ""; });
+  countdown(deal);
+}
+
+function showIntro() {
+  const p = el("panel");
+  p.innerHTML =
+    `<div class="big">${CFG.emoji}</div>
+     <h1>${CFG.title}</h1>
+     <p>Lay the phone flat between you — <b style="color:${CFG.p1.color}">${names[0]}</b> sits at the bottom,
+        <b style="color:${CFG.p2.color}">${names[1]}</b> opposite (your card faces you!).</p>
+     <p>Every two cards share <b>exactly ONE ${CFG.matchWord}</b>. Spot it first and tap it on
+        <b>your own card</b>. Wrong tap = short freeze! First to ${CFG.target} wins.</p>
+     <button class="go" id="startBtn">Start the face-off! ⚡</button>`;
+  el("overlay").style.display = "flex";
+  el("startBtn").addEventListener("click", () => {
+    el("overlay").style.display = "none";
+    Banter.say("start", names[0] + " & " + names[1]);
+    startMatch();
+  });
+}
+
+window.addEventListener("resize", () => {
+  if (cardA && cardB) { renderCard(0); renderCard(1); }
+});
+window.addEventListener("contextmenu", (e) => e.preventDefault());
+
+Banter.askNames(
+  { title: CFG.emoji + " " + CFG.title, slots: [
+    { label: CFG.p1.label, color: CFG.p1.color },
+    { label: CFG.p2.label, color: CFG.p2.color },
+  ]},
+  (nm) => { names = nm; updateHUD(); showIntro(); }
+);
+updateHUD();
+</script>
+</body>
+</html>

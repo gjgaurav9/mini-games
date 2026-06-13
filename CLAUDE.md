@@ -41,6 +41,14 @@ step, no dependencies, no frameworks. Family/kid-friendly, cozy visual style.
 `dots-and-boxes` (2–4p; pick grid size),
 `checkers` (2p; American rules — forced captures, multi-jumps, kings).
 
+**Dobble — head-to-head "spot it!" (2 players, split-screen, one device flat on table):**
+`dobble-animals` (Safari, 6 symbols/card), `dobble-food` (Feast, 6/card),
+`dobble-classic` (8/card). Decks are generated from a **projective plane of order n**
+(`buildDeck(n)` → any two cards share exactly ONE symbol; needs `n²+n+1` symbols). Top
+half is rotated 180° for the opposite player; tap the shared symbol on your card to
+score, wrong tap = short freeze. All three share one templated `index.html` differing
+only in the `CFG` block (emoji/title/matchWord/n/symbols/colors) — keep them in sync.
+
 **Quick solo play (collecting games):**
 `apple-collecting-game`, `collect-banana`, `broccoli-collection-game`.
 
