@@ -49,6 +49,17 @@ half is rotated 180° for the opposite player; tap the shared symbol on your car
 score, wrong tap = short freeze. All three share one templated `index.html` differing
 only in the `CFG` block (emoji/title/matchWord/n/symbols/colors) — keep them in sync.
 
+**Learn & play — letters & spelling (solo, ~ages 3–6, no-fail):**
+`abc-missing-letter` (ABC Train — fill the missing letter in a 3-letter window `A _ C`;
+tap one of 3 big tiles, never type; stars as reward; `Aa` upper/lower toggle; pure DOM, no
+canvas), `trace-and-spell` (Trace & Spell — emoji picture + lowercase CVC word, trace each
+letter on a **canvas** then advance; rhyming families grouped; finger drawing via pointer
+events + `touch-action:none`, DPR-scaled, midpoint-quadratic smoothing; completion by
+**lenient ~60% coverage** sampled from an offscreen glyph render, plus a ✓ Done fallback).
+Both skip `askNames` (big Play button), load `banter.js` for sfx/music/home/mute, and use
+**no TTS** (kept consistent with the rest of the repo). Design is grounded in early-literacy
+research (3-letter window for working memory, tap-not-type, no penalties, effort rewards).
+
 **Quick solo play (collecting games):**
 `apple-collecting-game`, `collect-banana`, `broccoli-collection-game`.
 

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>✏️ Trace & Spell</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%; overflow: hidden;
+    font-family: "Comic Sans MS", "Trebuchet MS", sans-serif;
+    background: linear-gradient(160deg, #ffd9ec 0%, #ffe9c7 50%, #d9f7c8 100%);
+    color: #2c3e50; -webkit-user-select: none; user-select: none;
+    overscroll-behavior: none;
+  }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; }
+  .pic { font-size: clamp(54px, 15vw, 104px); line-height: 1; margin-top: 10px; transition: transform .2s; }
+  .pic.bounce { animation: bounce .6s; }
+  @keyframes bounce { 0%,100%{transform:scale(1)} 30%{transform:scale(1.3) rotate(-6deg)} 60%{transform:scale(1.15) rotate(5deg)} }
+  .word { display: flex; gap: clamp(5px, 1.6vw, 10px); margin: 6px 0 2px; }
+  .ltr {
+    width: clamp(34px, 10vw, 56px); height: clamp(44px, 13vw, 72px);
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(26px, 8vw, 46px); font-weight: bold;
+    border-radius: 12px; background: rgba(255,255,255,0.5); color: #b7c2cf;
+    border: 3px solid transparent;
+  }
+  .ltr.done { background: linear-gradient(160deg,#5fd17a,#34b85a); color: #fff; border-color: transparent; }
+  .ltr.cur { color: #e84393; border-color: #e84393; background: #fff; animation: glow 1.1s ease-in-out infinite; }
+  @keyframes glow { 0%,100%{box-shadow:0 0 0 0 rgba(232,67,147,0.0)} 50%{box-shadow:0 0 0 5px rgba(232,67,147,0.25)} }
+  .hint { font-size: clamp(13px, 3.4vw, 17px); color: #5d6d7e; margin: 2px 0 4px; }
+  .canvasWrap { flex: 1; width: 100%; min-height: 0; position: relative; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+  .controls { display: flex; gap: 14px; padding: 10px 0 calc(14px + env(safe-area-inset-bottom)); }
+  .ctrl {
+    border: none; cursor: pointer; font-family: inherit; font-weight: bold; color: #fff;
+    border-radius: 16px; padding: 12px 18px; font-size: clamp(15px, 4vw, 19px);
+  }
+  .ctrl.redo { background: #f0932b; box-shadow: 0 4px 0 #b8601a; }
+  .ctrl.ok   { background: #34b85a; box-shadow: 0 4px 0 #1e8449; }
+  .ctrl.next { background: #2b8fd6; box-shadow: 0 4px 0 #1f6fb2; }
+  .ctrl:active { transform: translateY(3px); box-shadow: none; }
+  .overlay { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.6); padding: 20px; }
+  .panel { background: #fff; border-radius: 26px; padding: 28px 24px; max-width: 440px; width: 100%; text-align: center; box-shadow: 0 18px 48px rgba(0,0,0,0.5); }
+  .panel .big { font-size: clamp(58px, 16vw, 96px); }
+  .panel h1 { font-size: clamp(26px, 6vw, 38px); margin: 6px 0; }
+  .panel p { font-size: clamp(14px, 3.6vw, 18px); color: #5d6d7e; margin: 10px 0; line-height: 1.5; }
+  .panel .go { margin-top: 14px; width: 100%; padding: 15px; border: none; border-radius: 16px; font-family: inherit; font-size: clamp(19px, 5vw, 24px); font-weight: bold; cursor: pointer; background: #e84393; color: #fff; box-shadow: 0 5px 0 #b52e6f; }
+  .panel .go:active { transform: translateY(3px); box-shadow: 0 2px 0 #b52e6f; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="pic" id="pic">🐱</div>
+  <div class="word" id="word"></div>
+  <div class="hint" id="hint">Trace the pink letter with your finger ✏️</div>
+  <div class="canvasWrap"><canvas id="c"></canvas></div>
+  <div class="controls">
+    <button class="ctrl redo" id="redoBtn">↩ Redo</button>
+    <button class="ctrl ok" id="okBtn">✓ Done</button>
+    <button class="ctrl next" id="nextBtn">Next ▶</button>
+  </div>
+</div>
+<div class="overlay" id="overlay"><div class="panel" id="panel"></div></div>
+
+<script src="../shared/banter.js"></script>
+<script>
+"use strict";
+// Simple CVC words, grouped so rhyming families sit together (-at, -og, -un ...).
+// Lowercase, since ~95% of real text is lowercase. Each word has a picture.
+const WORDS = [
+  {w:"cat",e:"🐱"},{w:"hat",e:"🎩"},{w:"bat",e:"🦇"},{w:"rat",e:"🐀"},
+  {w:"dog",e:"🐶"},{w:"log",e:"🪵"},
+  {w:"pig",e:"🐷"},
+  {w:"sun",e:"☀️"},{w:"bun",e:"🥯"},
+  {w:"fox",e:"🦊"},{w:"box",e:"📦"},
+  {w:"hen",e:"🐔"},{w:"pen",e:"🖊️"},
+  {w:"van",e:"🚐"},{w:"pan",e:"🍳"},{w:"fan",e:"🪭"},
+  {w:"bus",e:"🚌"},{w:"cow",e:"🐮"},{w:"bee",e:"🐝"},{w:"car",e:"🚗"},
+  {w:"cup",e:"🥤"},{w:"bed",e:"🛏️"},{w:"ant",e:"🐜"},{w:"jam",e:"🍯"},
+  {w:"web",e:"🕸️"},{w:"net",e:"🥅"},{w:"map",e:"🗺️"},{w:"owl",e:"🦉"},
+  {w:"egg",e:"🥚"},{w:"key",e:"🔑"},
+];
+
+const cv = document.getElementById("c");
+let ctx, cssW = 0, cssH = 0;
+let wi = 0, li = 0;            // word index, letter index
+let drawing = false, pts = [], drawn = [];   // current stroke pts, all points this letter
+let targets = [];             // sample points on the current letter (for coverage)
+let cx = 0, cy = 0, gsize = 0;
+const el = (id) => document.getElementById(id);
+
+// ---- canvas setup, crisp on retina ----
+function setupCanvas(){
+  const r = cv.getBoundingClientRect();
+  cssW = r.width; cssH = r.height;
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = Math.round(cssW * dpr);
+  cv.height = Math.round(cssH * dpr);
+  ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);   // draw in CSS pixels
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+}
+
+function pos(e){ const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+
+// ---- draw the dashed letter guide + faint ghost ----
+function drawGuide(letter){
+  ctx.clearRect(0, 0, cssW, cssH);
+  gsize = Math.min(cssW, cssH) * 0.78;
+  cx = cssW / 2; cy = cssH / 2;
+  ctx.save();
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.font = `900 ${gsize}px "Comic Sans MS","Chalkboard SE",system-ui,sans-serif`;
+  ctx.fillStyle = "rgba(232,67,147,0.10)";          // ghost fill
+  ctx.fillText(letter, cx, cy);
+  ctx.lineWidth = Math.max(3, gsize * 0.028);
+  ctx.strokeStyle = "rgba(232,67,147,0.85)";        // dashed outline to trace
+  ctx.setLineDash([gsize * 0.05, gsize * 0.05]);
+  ctx.strokeText(letter, cx, cy);
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+// ---- build sample target points on the glyph (offscreen) for coverage ----
+function buildTargets(letter){
+  const off = document.createElement("canvas");
+  off.width = Math.max(1, Math.ceil(cssW)); off.height = Math.max(1, Math.ceil(cssH));
+  const o = off.getContext("2d");
+  o.textAlign = "center"; o.textBaseline = "middle";
+  o.font = `900 ${gsize}px "Comic Sans MS","Chalkboard SE",system-ui,sans-serif`;
+  o.fillStyle = "#000";
+  o.fillText(letter, cx, cy);
+  const data = o.getImageData(0, 0, off.width, off.height).data;
+  const step = 7, t = [];
+  for (let y = 0; y < off.height; y += step)
+    for (let x = 0; x < off.width; x += step)
+      if (data[(y * off.width + x) * 4 + 3] > 50) t.push({ x, y });
+  return t;
+}
+
+function coverage(){
+  if (!targets.length) return 0;
+  const thr = 24, t2 = thr * thr; let hit = 0;
+  for (const tp of targets){
+    for (const dp of drawn){
+      const dx = tp.x - dp.x, dy = tp.y - dp.y;
+      if (dx*dx + dy*dy <= t2){ hit++; break; }
+    }
+  }
+  return hit / targets.length;
+}
+
+// ---- crayon stroke with midpoint quadratic smoothing ----
+function strokeLive(){
+  ctx.strokeStyle = "#ff5fa2";
+  ctx.lineWidth = Math.max(14, gsize * 0.085);
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length - 1; i++){
+    const mx = (pts[i].x + pts[i+1].x) / 2, my = (pts[i].y + pts[i+1].y) / 2;
+    ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+  }
+  if (pts.length > 1){ const last = pts[pts.length-1]; ctx.lineTo(last.x, last.y); }
+  ctx.stroke();
+}
+
+function down(e){ e.preventDefault(); drawing = true; const p = pos(e); pts = [p]; drawn.push(p); cv.setPointerCapture(e.pointerId); strokeLive(); }
+function move(e){ if (!drawing) return; const p = pos(e); pts.push(p); drawn.push(p); strokeLive(); }
+function up(){ if (!drawing) return; drawing = false; if (coverage() >= 0.6) letterDone(); }
+
+cv.addEventListener("pointerdown", down);
+cv.addEventListener("pointermove", move);
+cv.addEventListener("pointerup", up);
+cv.addEventListener("pointercancel", up);
+
+// ---- word / letter flow ----
+function renderWord(){
+  const word = WORDS[wi].w;
+  el("pic").textContent = WORDS[wi].e;
+  const box = el("word"); box.innerHTML = "";
+  [...word].forEach((ch, i) => {
+    const d = document.createElement("div");
+    d.className = "ltr" + (i < li ? " done" : i === li ? " cur" : "");
+    d.textContent = ch;
+    box.appendChild(d);
+  });
+}
+function showLetter(){
+  drawn = []; pts = [];
+  renderWord();
+  const word = WORDS[wi].w;
+  drawGuide(word[li]);
+  targets = buildTargets(word[li]);
+}
+function sparkle(){
+  for (let i = 0; i < 10; i++){
+    const a = (Math.PI * 2 * i) / 10, d = gsize * 0.5;
+    ctx.font = "26px serif"; ctx.fillText("✨", cx + Math.cos(a)*d, cy + Math.sin(a)*d);
+  }
+}
+function letterDone(){
+  Banter.sfx("good");
+  sparkle();
+  li++;
+  const word = WORDS[wi].w;
+  if (li >= word.length) wordDone();
+  else setTimeout(showLetter, 650);
+}
+function wordDone(){
+  Banter.sfx("win");
+  el("pic").classList.remove("bounce"); void el("pic").offsetWidth; el("pic").classList.add("bounce");
+  // mark all letters done
+  [...el("word").children].forEach((c) => { c.className = "ltr done"; });
+  el("hint").textContent = "🎉 You spelled " + WORDS[wi].w.toUpperCase() + "! Tap Next ▶";
+  setTimeout(() => { nextWord(); }, 2000);
+}
+function nextWord(){
+  wi = (wi + 1) % WORDS.length; li = 0;
+  el("hint").textContent = "Trace the pink letter with your finger ✏️";
+  showLetter();
+}
+
+el("redoBtn").addEventListener("click", () => { Banter.sfx("click"); showLetter(); });
+el("okBtn").addEventListener("click", () => { Banter.sfx("click"); letterDone(); });
+el("nextBtn").addEventListener("click", () => { Banter.sfx("click"); nextWord(); });
+
+window.addEventListener("resize", () => { if (ctx){ setupCanvas(); showLetter(); } });
+window.addEventListener("contextmenu", (e) => e.preventDefault());
+
+function start(){
+  setupCanvas();
+  wi = 0; li = 0;
+  showLetter();
+}
+function showIntro(){
+  el("panel").innerHTML =
+    `<div class="big">✏️🐱</div>
+     <h1>Trace &amp; Spell</h1>
+     <p>See the picture, then <b>trace each letter</b> of its name with your finger.
+        Fill them all in to spell the word!</p>
+     <p>Words that <b>rhyme</b> come together — cat, hat, bat… 🎵 No losing, just practice. 💛</p>
+     <button class="go" id="startBtn">Start tracing! ✏️</button>`;
+  el("overlay").style.display = "flex";
+  el("startBtn").addEventListener("click", () => {
+    el("overlay").style.display = "none";
+    Banter.sfx("start");
+    start();
+  });
+}
+showIntro();
+</script>
+</body>
+</html>

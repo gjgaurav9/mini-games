@@ -29,6 +29,15 @@ Lay the phone flat between you (each player's card faces them). Every two cards 
 | 🍔 | **[Dobble Feast](dobble-food/index.html)** | 6 foods per card — fruits, snacks and treats. Grab the matching bite before your rival. |
 | ⚡ | **[Dobble Classic](dobble-classic/index.html)** | The full pack — 8 mixed symbols per card. Harder to scan, easier to fumble. |
 
+## 📚 Learn & play — letters & spelling (about ages 3–6)
+
+Gentle, **no-losing** learning games for little ones. Big touch targets, happy sounds and stars — built to grow letter recognition, alphabet order, letter sounds and early spelling. Grounded in early-literacy research (3-letter window so it never overwhelms working memory; tap-to-pick instead of typing; lenient finger-tracing; rhyming word families; effort-based encouragement, no penalties).
+
+| | Game | Description |
+|---|------|-------------|
+| 🔤 | **[ABC Train](abc-missing-letter/index.html)** | A letter fell off the train — see the letters on each side (A&nbsp;_&nbsp;C) and tap the one that belongs in between. Three big choices, a star for every win, and an `Aa` toggle for capital or small letters. Builds alphabet order, letter recognition and visual discrimination. |
+| ✏️ | **[Trace & Spell](trace-and-spell/index.html)** | See a picture, then trace each letter of its name with a finger to spell the word. Words are grouped into rhyming families (cat, hat, bat…). Lenient tracing with a ✓ Done helper — no failing. Builds letter formation, fine-motor skills, phonics and early spelling. |
+
 ## 🕹️ Quick solo play
 
 | | Game | Description |
