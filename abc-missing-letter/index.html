@@ -102,6 +102,29 @@ let answer = -1, busy = false;
 const el = (id) => document.getElementById(id);
 function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];} return a; }
 function L(i){ const c = String.fromCharCode(A + i); return upper ? c : c.toLowerCase(); }
+function nm(i){ return String.fromCharCode(A + i); }  // uppercase so TTS says the letter NAME
+
+// ---- spoken letter names (Web Speech API; offline via the device's own voices) ----
+let _voice = null;
+function _pickVoice(){
+  if (!("speechSynthesis" in window)) return;
+  const vs = speechSynthesis.getVoices();
+  _voice = vs.find(v => /en[-_]US/i.test(v.lang) && /(samantha|karen|zira|female|google us english)/i.test(v.name))
+        || vs.find(v => /^en/i.test(v.lang)) || vs[0] || null;
+}
+if ("speechSynthesis" in window){ _pickVoice(); speechSynthesis.onvoiceschanged = _pickVoice; }
+function isMuted(){ try { return localStorage.getItem("miniGames.muted") === "1"; } catch(e){ return false; } }
+function speak(text, rate){
+  if (!("speechSynthesis" in window) || isMuted() || !text) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    if (_voice) u.voice = _voice;
+    u.lang = (_voice && _voice.lang) || "en-US";
+    u.rate = rate || 0.9; u.pitch = 1.15;
+    speechSynthesis.speak(u);
+  } catch(e){}
+}
 
 function car(text, isSlot){
   const d = document.createElement("div");
@@ -141,6 +164,8 @@ function newPuzzle(){
     b.addEventListener("click", () => pick(idx, b));
     ch.appendChild(b);
   });
+  // gentle spoken hint: name the two letters either side of the gap
+  setTimeout(() => speak(nm(start) + " ... " + nm(start + 2), 0.8), 350);
 }
 
 function pick(idx, btn){
@@ -148,6 +173,7 @@ function pick(idx, btn){
   if (idx === answer){
     busy = true;
     Banter.sfx("great");
+    speak(nm(answer));   // say the letter that was missing, e.g. "B"
     const slot = el("slot");
     slot.textContent = L(answer);
     slot.classList.add("filled");
@@ -190,7 +216,8 @@ function showIntro(){
      <h1>ABC Train</h1>
      <p>One letter jumped off the train! Look at the letters on each side and tap the
         one that belongs <b>in the middle</b>.</p>
-     <p>Every right answer earns a ⭐. There's no losing — take your time! 💛</p>
+     <p>It says the letters <b>out loud</b> 🔊 to help you. Every right answer earns a ⭐ —
+        there's no losing, take your time! 💛 <span style="font-size:.85em">(🔇 button mutes the voice.)</span></p>
      <button class="go" id="startBtn">Let's go! 🚂</button>`;
   el("overlay").style.display = "flex";
   el("startBtn").addEventListener("click", () => {

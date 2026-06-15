@@ -21,7 +21,7 @@ Each game is a single, self-contained `index.html` (HTML5 canvas + vanilla JavaS
 
 ## ⚡ Dobble — head-to-head spot it! (2 players, one device)
 
-Lay the phone flat between you (each player's card faces them). Every two cards share **exactly ONE** matching picture — be the first to spot it and tap it on your card to score. A wrong tap freezes you for a moment. First to 7 wins. The decks use a projective-plane layout, so any two cards always share precisely one symbol.
+Lay the phone flat between you (each player's card faces them). Every two cards share **exactly ONE** matching picture — be the first to spot it and tap it on your card to score. A wrong tap **costs a point** and freezes you for a moment. First to 7 wins. The decks use a projective-plane layout, so any two cards always share precisely one symbol.
 
 | | Game | Description |
 |---|------|-------------|
@@ -31,7 +31,7 @@ Lay the phone flat between you (each player's card faces them). Every two cards 
 
 ## 📚 Learn & play — letters & spelling (about ages 3–6)
 
-Gentle, **no-losing** learning games for little ones. Big touch targets, happy sounds and stars — built to grow letter recognition, alphabet order, letter sounds and early spelling. Grounded in early-literacy research (3-letter window so it never overwhelms working memory; tap-to-pick instead of typing; lenient finger-tracing; rhyming word families; effort-based encouragement, no penalties).
+Gentle, **no-losing** learning games for little ones. Big touch targets, happy sounds and stars, and a **spoken voice** that names the letters and reads the words aloud (mutable with the 🔇 button). Built to grow letter recognition, alphabet order, letter sounds and early spelling. Grounded in early-literacy research (3-letter window so it never overwhelms working memory; tap-to-pick instead of typing; lenient finger-tracing; rhyming word families; effort-based encouragement, no penalties).
 
 | | Game | Description |
 |---|------|-------------|

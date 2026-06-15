@@ -90,6 +90,31 @@ let targets = [];             // sample points on the current letter (for covera
 let cx = 0, cy = 0, gsize = 0;
 const el = (id) => document.getElementById(id);
 
+// ---- spoken letters & words (Web Speech API; offline via the device's own voices) ----
+// We speak each letter's NAME as the child traces it, and the whole WORD ("sound it out")
+// when the word is finished — reliable and clean (browser TTS can't produce a tidy isolated
+// /b/ /k/ phoneme, and a mangled "buh/kuh" actually hurts blending).
+let _voice = null;
+function _pickVoice(){
+  if (!("speechSynthesis" in window)) return;
+  const vs = speechSynthesis.getVoices();
+  _voice = vs.find(v => /en[-_]US/i.test(v.lang) && /(samantha|karen|zira|female|google us english)/i.test(v.name))
+        || vs.find(v => /^en/i.test(v.lang)) || vs[0] || null;
+}
+if ("speechSynthesis" in window){ _pickVoice(); speechSynthesis.onvoiceschanged = _pickVoice; }
+function isMuted(){ try { return localStorage.getItem("miniGames.muted") === "1"; } catch(e){ return false; } }
+function speak(text, rate){
+  if (!("speechSynthesis" in window) || isMuted() || !text) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    if (_voice) u.voice = _voice;
+    u.lang = (_voice && _voice.lang) || "en-US";
+    u.rate = rate || 0.9; u.pitch = 1.15;
+    speechSynthesis.speak(u);
+  } catch(e){}
+}
+
 // ---- canvas setup, crisp on retina ----
 function setupCanvas(){
   const r = cv.getBoundingClientRect();
@@ -192,6 +217,7 @@ function showLetter(){
   const word = WORDS[wi].w;
   drawGuide(word[li]);
   targets = buildTargets(word[li]);
+  speak(word[li].toUpperCase());   // name the letter to trace, e.g. "C"
 }
 function sparkle(){
   for (let i = 0; i < 10; i++){
@@ -212,8 +238,11 @@ function wordDone(){
   el("pic").classList.remove("bounce"); void el("pic").offsetWidth; el("pic").classList.add("bounce");
   // mark all letters done
   [...el("word").children].forEach((c) => { c.className = "ltr done"; });
-  el("hint").textContent = "🎉 You spelled " + WORDS[wi].w.toUpperCase() + "! Tap Next ▶";
-  setTimeout(() => { nextWord(); }, 2000);
+  const w = WORDS[wi].w;
+  el("hint").textContent = "🎉 You spelled " + w.toUpperCase() + "! Tap Next ▶";
+  // sound it out: spell the letters, then say the whole word
+  speak(w.toUpperCase().split("").join(", ") + ". " + w, 0.82);
+  setTimeout(() => { nextWord(); }, 2400);
 }
 function nextWord(){
   wi = (wi + 1) % WORDS.length; li = 0;
@@ -224,6 +253,8 @@ function nextWord(){
 el("redoBtn").addEventListener("click", () => { Banter.sfx("click"); showLetter(); });
 el("okBtn").addEventListener("click", () => { Banter.sfx("click"); letterDone(); });
 el("nextBtn").addEventListener("click", () => { Banter.sfx("click"); nextWord(); });
+el("pic").style.cursor = "pointer";
+el("pic").addEventListener("click", () => speak(WORDS[wi].w));   // tap the picture to hear the word
 
 window.addEventListener("resize", () => { if (ctx){ setupCanvas(); showLetter(); } });
 window.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -239,7 +270,9 @@ function showIntro(){
      <h1>Trace &amp; Spell</h1>
      <p>See the picture, then <b>trace each letter</b> of its name with your finger.
         Fill them all in to spell the word!</p>
-     <p>Words that <b>rhyme</b> come together — cat, hat, bat… 🎵 No losing, just practice. 💛</p>
+     <p>It <b>says each letter</b> 🔊 as you trace, and reads the whole word when you finish.
+        Tap the picture to hear it again. Words that <b>rhyme</b> come together — cat, hat, bat… 🎵
+        No losing, just practice. 💛</p>
      <button class="go" id="startBtn">Start tracing! ✏️</button>`;
   el("overlay").style.display = "flex";
   el("startBtn").addEventListener("click", () => {

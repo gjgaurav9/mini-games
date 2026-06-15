@@ -46,7 +46,7 @@ step, no dependencies, no frameworks. Family/kid-friendly, cozy visual style.
 `dobble-classic` (8/card). Decks are generated from a **projective plane of order n**
 (`buildDeck(n)` → any two cards share exactly ONE symbol; needs `n²+n+1` symbols). Top
 half is rotated 180° for the opposite player; tap the shared symbol on your card to
-score, wrong tap = short freeze. All three share one templated `index.html` differing
+score, wrong tap = **−1** and a short freeze. All three share one templated `index.html` differing
 only in the `CFG` block (emoji/title/matchWord/n/symbols/colors) — keep them in sync.
 
 **Learn & play — letters & spelling (solo, ~ages 3–6, no-fail):**
@@ -56,9 +56,18 @@ canvas), `trace-and-spell` (Trace & Spell — emoji picture + lowercase CVC word
 letter on a **canvas** then advance; rhyming families grouped; finger drawing via pointer
 events + `touch-action:none`, DPR-scaled, midpoint-quadratic smoothing; completion by
 **lenient ~60% coverage** sampled from an offscreen glyph render, plus a ✓ Done fallback).
-Both skip `askNames` (big Play button), load `banter.js` for sfx/music/home/mute, and use
-**no TTS** (kept consistent with the rest of the repo). Design is grounded in early-literacy
-research (3-letter window for working memory, tap-not-type, no penalties, effort rewards).
+Both skip `askNames` (big Play button), load `banter.js` for sfx/music/home/mute. Design is
+grounded in early-literacy research (3-letter window for working memory, tap-not-type, no
+penalties, effort rewards).
+
+**TTS exception — these two games DO use spoken voice** (user-requested, June 2026). Each has
+its own small `speak()` helper over the **Web Speech API** (`SpeechSynthesisUtterance`, offline
+via the device's own voices) — NOT in `banter.js`. ABC Train speaks the two flanking letter
+names as a hint and the answer on success; Trace & Spell speaks each letter's NAME as you trace
+it, the whole word ("sound it out") on completion, and re-reads on picture tap. Speech is gated
+by the shared mute flag (`localStorage miniGames.muted`). We speak letter NAMES + whole WORDS,
+not isolated phonemes — browser TTS can't make a clean `/b/` and a mangled "buh" hurts blending.
+This is the *only* place TTS lives; the board/Dobble games stay voice-free (see note below).
 
 **Quick solo play (collecting games):**
 `apple-collecting-game`, `collect-banana`, `broccoli-collection-game`.
@@ -132,4 +141,6 @@ vercel deploy --prod --yes          # → Vercel (manual)
   not live playtest.)
 - Optional "Leave game?" confirm on the 🏠 button (currently navigates immediately).
 
-**Note:** the spoken voice was removed on purpose — do not re-add TTS unless asked.
+**Note:** the spoken voice was removed from the board/Dobble games and `banter.js` on purpose
+— do not re-add TTS there unless asked. (Exception: the two kids' learning games `abc-missing-letter`
+and `trace-and-spell` use Web Speech TTS by explicit request — see the Learn & play section.)
