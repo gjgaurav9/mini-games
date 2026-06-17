@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>🎲 Ludo — Pass & Play</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -14,7 +14,7 @@
     user-select: none; -webkit-user-select: none; touch-action: none;
   }
   #game {
-    position: relative; width: 100vw; height: 100vh;
+    position: relative; width: 100vw; height: 100vh; height: 100dvh;
     background: radial-gradient(circle at 50% 30%, #2c2f3a 0%, #15171e 100%);
     overflow: hidden;
   }
@@ -57,7 +57,7 @@
     color: #2c3e50; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,0.3);
   }
   #docker {
-    position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+    position: absolute; bottom: calc(12px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
     z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 6px;
   }
   #rollMsg { color: #ecf0f1; font-size: clamp(13px, 3vw, 18px); min-height: 1.2em; text-shadow: 0 1px 3px #000; text-align: center; }
@@ -186,10 +186,11 @@ function buildFullPath(color) {
 let W, H, BSZ, OX, OY, cell;
 function computeLayout() {
   W = canvas.clientWidth; H = canvas.clientHeight;
-  BSZ = Math.min(W * 0.96, H * 0.86);
+  const band = Math.min(140, H * 0.17);          // reserve room for the dice docker at the bottom
+  BSZ = Math.min(W * 0.96, (H - band) * 0.98);
   cell = BSZ / 15;
   OX = (W - BSZ) / 2;
-  OY = (H - BSZ) / 2 + Math.min(10, H * 0.01);
+  OY = (H - band - BSZ) / 2 + Math.min(10, H * 0.01);
 }
 function cc(col, row) { return { x: OX + (col + 0.5) * cell, y: OY + (row + 0.5) * cell }; }
 

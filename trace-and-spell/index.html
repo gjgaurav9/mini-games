@@ -82,6 +82,15 @@ const WORDS = [
   {w:"egg",e:"🥚"},{w:"key",e:"🔑"},
 ];
 
+// phonics letter SOUNDS (lowercase) — say the sound ("ah"), not the capital name ("A")
+const SOUNDS = {
+  a:"ah", b:"buh", c:"kuh", d:"duh", e:"eh", f:"fff", g:"guh", h:"huh",
+  i:"ih", j:"juh", k:"kuh", l:"lll", m:"mmm", n:"nnn", o:"oh", p:"puh",
+  q:"kwuh", r:"rrr", s:"sss", t:"tuh", u:"uh", v:"vvv", w:"wuh", x:"ks",
+  y:"yuh", z:"zzz",
+};
+function sndOf(ch){ return SOUNDS[ch.toLowerCase()] || ch; }
+
 const cv = document.getElementById("c");
 let ctx, cssW = 0, cssH = 0;
 let wi = 0, li = 0;            // word index, letter index
@@ -91,9 +100,9 @@ let cx = 0, cy = 0, gsize = 0;
 const el = (id) => document.getElementById(id);
 
 // ---- spoken letters & words (Web Speech API; offline via the device's own voices) ----
-// We speak each letter's NAME as the child traces it, and the whole WORD ("sound it out")
-// when the word is finished — reliable and clean (browser TTS can't produce a tidy isolated
-// /b/ /k/ phoneme, and a mangled "buh/kuh" actually hurts blending).
+// We speak each letter's phonics SOUND (via SOUNDS, e.g. a -> "ah") as the child traces it,
+// then sound out + say the whole WORD when finished. Sounds (not capital letter NAMES) match
+// how the letters sound inside the word.
 let _voice = null;
 function _pickVoice(){
   if (!("speechSynthesis" in window)) return;
@@ -217,7 +226,7 @@ function showLetter(){
   const word = WORDS[wi].w;
   drawGuide(word[li]);
   targets = buildTargets(word[li]);
-  speak(word[li].toUpperCase());   // name the letter to trace, e.g. "C"
+  speak(sndOf(word[li]));   // say the letter's sound, e.g. "ah" for a
 }
 function sparkle(){
   for (let i = 0; i < 10; i++){
@@ -240,8 +249,8 @@ function wordDone(){
   [...el("word").children].forEach((c) => { c.className = "ltr done"; });
   const w = WORDS[wi].w;
   el("hint").textContent = "🎉 You spelled " + w.toUpperCase() + "! Tap Next ▶";
-  // sound it out: spell the letters, then say the whole word
-  speak(w.toUpperCase().split("").join(", ") + ". " + w, 0.82);
+  // sound it out: each letter's sound, then say the whole word
+  speak(w.split("").map(sndOf).join(", ") + ". " + w, 0.78);
   setTimeout(() => { nextWord(); }, 2400);
 }
 function nextWord(){
@@ -270,7 +279,7 @@ function showIntro(){
      <h1>Trace &amp; Spell</h1>
      <p>See the picture, then <b>trace each letter</b> of its name with your finger.
         Fill them all in to spell the word!</p>
-     <p>It <b>says each letter</b> 🔊 as you trace, and reads the whole word when you finish.
+     <p>It <b>sounds out each letter</b> 🔊 as you trace, and reads the whole word when you finish.
         Tap the picture to hear it again. Words that <b>rhyme</b> come together — cat, hat, bat… 🎵
         No losing, just practice. 💛</p>
      <button class="go" id="startBtn">Start tracing! ✏️</button>`;

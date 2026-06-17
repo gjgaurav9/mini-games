@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>🐍 Snakes & Ladders — Pass & Play</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -14,7 +14,7 @@
     user-select: none; -webkit-user-select: none; touch-action: none;
   }
   #game {
-    position: relative; width: 100vw; height: 100vh;
+    position: relative; width: 100vw; height: 100vh; height: 100dvh;
     background: radial-gradient(circle at 50% 30%, #2e5d43 0%, #16281d 100%);
     overflow: hidden;
     display: flex; flex-direction: column;
@@ -60,7 +60,7 @@
   }
 
   #docker {
-    position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+    position: absolute; bottom: calc(12px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
     z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 6px;
   }
   #rollMsg { color: #ecf0f1; font-size: clamp(13px, 3vw, 18px); min-height: 1.2em; text-shadow: 0 1px 3px #000; }
@@ -153,10 +153,11 @@ const COLORS = [
 let W, H, B, OX, OY, cell;   // board size B, origin OX/OY, cell size
 function computeLayout() {
   W = canvas.clientWidth; H = canvas.clientHeight;
-  B = Math.min(W * 0.96, H * 0.82);
+  const band = Math.min(140, H * 0.17);          // reserve room for the dice docker at the bottom
+  B = Math.min(W * 0.96, (H - band) * 0.98);
   cell = B / 10;
   OX = (W - B) / 2;
-  OY = (H - B) / 2 - H * 0.01;
+  OY = (H - band - B) / 2 - H * 0.01;
 }
 function cellCenter(n) {
   // n: 1..100, row 0 at bottom, boustrophedon
