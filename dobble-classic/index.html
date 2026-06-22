@@ -78,6 +78,25 @@
     background: rgba(44,62,80,0.55);
     padding: 3px 0; width: 100%;
   }
+  /* commentary lives in the NEUTRAL centre strip between the cards, never over them,
+     and is mirrored so both players (one is upside-down) can read it. */
+  #comment {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    z-index: 40; width: 100%; pointer-events: none;
+    display: none; flex-direction: column; align-items: center; gap: 4px;
+  }
+  #comment.show { display: flex; }
+  #comment .c {
+    font-family: "Comic Sans MS", "Trebuchet MS", sans-serif; font-weight: bold;
+    font-size: clamp(14px, 3.6vw, 21px); color: #fff;
+    background: rgba(20,28,40,0.92); padding: 5px 16px; border-radius: 16px;
+    border: 2px solid rgba(241,196,15,0.85); box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+    max-width: 86vw; text-align: center; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  #comment .c.top { transform: rotate(180deg); }
+  #comment.show .c { animation: commentPop .3s ease-out; }
+  @keyframes commentPop { 0%{opacity:0;} 100%{opacity:1;} }
   .overlay {
     position: fixed; inset: 0; z-index: 70;
     display: flex; align-items: center; justify-content: center;
@@ -112,6 +131,7 @@
     <div class="cardWrap"><div class="card dealing" id="card2"></div></div>
   </div>
   <div class="divider"><span id="roundLbl">Spot the ONE matching picture — tap it on YOUR card!</span></div>
+  <div id="comment"><div class="c top" id="commentTop"></div><div class="c" id="commentBot"></div></div>
   <div class="half bottom">
     <div class="cardWrap"><div class="card dealing" id="card1"></div></div>
     <div class="hud"><span class="pname" id="name1">Player 1</span><span class="pips" id="pips1"></span></div>
@@ -236,6 +256,41 @@ function deal() {
   }, 320);
 }
 
+// ===================== COMMENTARY (centre strip + real voice) =====================
+// Shown in the neutral strip BETWEEN the cards (never over a card), mirrored so both
+// players can read it. Spoken with REAL recorded Hinglish clips when present — NOT
+// robotic browser TTS. Until you drop clips in, it plays the existing synth cue.
+//
+// To add real voice: record (or generate with a natural Hindi voice) short clips,
+// drop the files in shared/commentary/, and list them below. e.g.
+//   great: ["../shared/commentary/great-1.mp3", "../shared/commentary/great-2.mp3"]
+const LINES = {
+  start:   ["Chalo, shuru karte hain!", "All the best dono ko!", "Ho jaaye muqabla!"],
+  good:    ["Shabash!", "Badhiya!", "Sahi pakde!"],
+  great:   ["Kya baat! Maza aa gaya!", "Wah wah, laajawaab!", "Arre kya nazar hai!"],
+  combo:   ["Double dhamaka!", "Ek ke baad ek — rukna hi nahi!"],
+  unlucky: ["Oho, galat! Sambhal ke.", "Arre dhyaan se, koi na."],
+  win:     ["Game jeet liya! Kya khela!", "Take a bow — aaj ka champion!"],
+};
+const VOICE = { start: [], good: [], great: [], combo: [], unlucky: [], win: [] };
+function isMuted(){ try { return localStorage.getItem("miniGames.muted") === "1"; } catch (e) { return false; } }
+let _ci = {};
+function comment(cat) {
+  const arr = LINES[cat] || LINES.good;
+  const line = arr[(_ci[cat] = (_ci[cat] || 0)) % arr.length]; _ci[cat]++;
+  el("commentTop").textContent = el("commentBot").textContent = line;
+  const box = el("comment");
+  box.classList.remove("show"); void box.offsetWidth; box.classList.add("show");
+  clearTimeout(comment._t); comment._t = setTimeout(() => box.classList.remove("show"), 1900);
+  if (isMuted()) return;
+  const clips = VOICE[cat];
+  if (clips && clips.length) {                       // real recorded commentary
+    try { const a = new Audio(clips[(Math.random() * clips.length) | 0]); a.play().catch(() => {}); } catch (e) {}
+  } else {                                            // fallback synth cue until clips are added
+    Banter.sfx(cat === "win" ? "win" : cat === "unlucky" ? "unlucky" : cat === "combo" ? "combo" : cat === "start" ? "start" : "great");
+  }
+}
+
 function onTap(who, sym, dEl) {
   if (!roundLive || lock[who]) return;
   if (sym === shared) {
@@ -248,8 +303,8 @@ function onTap(who, sym, dEl) {
     Banter.sfx("pot");
     if (streakWho === who) streak++; else { streakWho = who; streak = 1; }
     if (score[who] >= CFG.target) { setTimeout(() => win(who), 900); return; }
-    if (streak === 3) Banter.say("combo", names[who]);
-    else if (Math.random() < 0.45) Banter.say(Math.random() < 0.5 ? "great" : "good", names[who]);
+    if (streak === 3) comment("combo");
+    else if (Math.random() < 0.45) comment(Math.random() < 0.5 ? "great" : "good");
     setTimeout(deal, 1050);
   } else {
     // wrong picture: lose a point and freeze briefly (round stays live for the rival)
@@ -257,8 +312,7 @@ function onTap(who, sym, dEl) {
     score[who] = Math.max(0, score[who] - 1);
     updateHUD();
     streak = 0; streakWho = -1;
-    Banter.sfx("unlucky");
-    if (Math.random() < 0.6) Banter.say("unlucky", names[who]);
+    if (Math.random() < 0.6) comment("unlucky"); else Banter.sfx("unlucky");
     const c = cardEls[who];
     c.classList.add("locked", "shake");
     setTimeout(() => { lock[who] = false; c.classList.remove("locked", "shake"); }, 1100);
@@ -268,7 +322,7 @@ function onTap(who, sym, dEl) {
 function win(who) {
   roundLive = false;
   Banter.turnClear();
-  Banter.say("win", names[who]);
+  comment("win");
   const p = el("panel");
   p.innerHTML =
     `<div class="big">🏆</div>
@@ -319,7 +373,7 @@ function showIntro() {
   el("overlay").style.display = "flex";
   el("startBtn").addEventListener("click", () => {
     el("overlay").style.display = "none";
-    Banter.say("start", names[0] + " & " + names[1]);
+    comment("start");
     startMatch();
   });
 }

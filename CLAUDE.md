@@ -49,6 +49,13 @@ half is rotated 180° for the opposite player; tap the shared symbol on your car
 score, wrong tap = **−1** and a short freeze. All three share one templated `index.html` differing
 only in the `CFG` block (emoji/title/matchWord/n/symbols/colors) — keep them in sync.
 
+**Dobble commentary** does NOT use `Banter.say` (its toast floated over the rotated top
+player's card). Instead each game has a local `comment(cat)` that shows the line in the
+**neutral centre strip** (`#comment`, mirrored top/bottom so both players read it, never over
+a card) and plays **real recorded Hinglish clips** when present via the `VOICE` map — falling
+back to a synth cue (`Banter.sfx`) until clips are added. No robotic TTS. Drop clips in
+`shared/commentary/` and fill `VOICE` in each game — see `shared/commentary/README.md`.
+
 **Learn & play — letters & spelling (solo, ~ages 3–6, no-fail):**
 `abc-missing-letter` (ABC Train — fill the missing letter in a 3-letter window `A _ C`;
 tap one of 3 big tiles, never type; stars as reward; `Aa` upper/lower toggle; pure DOM, no
