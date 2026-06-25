@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>🍔 Dobble Feast — Spot It Face-Off</title>
+<title>⚡ Eagle Eye: Lightning</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
     height: 100%;
     overflow: hidden;
     font-family: "Comic Sans MS", "Trebuchet MS", sans-serif;
-    background: linear-gradient(160deg, #ffe9a8 0%, #ffc97a 50%, #f59e5c 100%);
+    background: linear-gradient(160deg, #cdb6f5 0%, #a98ae8 50%, #7e5bd0 100%);
     color: #2c3e50;
     -webkit-user-select: none; user-select: none;
     touch-action: none;
@@ -113,9 +113,9 @@
   .panel .go {
     margin-top: 14px; width: 100%; padding: 14px; border: none; border-radius: 16px;
     font-family: inherit; font-size: clamp(18px, 4.5vw, 23px); cursor: pointer;
-    background: #e67e22; color: #fff; box-shadow: 0 5px 0 #b8601a; font-weight: bold;
+    background: #8e44ad; color: #fff; box-shadow: 0 5px 0 #6c3483; font-weight: bold;
   }
-  .panel .go:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8601a; }
+  .panel .go:active { transform: translateY(3px); box-shadow: 0 2px 0 #6c3483; }
   #countdown {
     position: fixed; inset: 0; z-index: 65; display: none;
     align-items: center; justify-content: center; pointer-events: none;
@@ -130,7 +130,7 @@
     <div class="hud"><span class="pname" id="name2">Player 2</span><span class="pips" id="pips2"></span></div>
     <div class="cardWrap"><div class="card dealing" id="card2"></div></div>
   </div>
-  <div class="divider"><span id="roundLbl">Spot the ONE matching food — tap it on YOUR card!</span></div>
+  <div class="divider"><span id="roundLbl">Spot the ONE matching picture — tap it on YOUR card!</span></div>
   <div id="comment"><div class="c top" id="commentTop"></div><div class="c" id="commentBot"></div></div>
   <div class="half bottom">
     <div class="cardWrap"><div class="card dealing" id="card1"></div></div>
@@ -143,21 +143,21 @@
 <script src="../shared/banter.js"></script>
 <script>
 "use strict";
-// ============ THEME CONFIG (the only part that differs between Dobble games) ============
+// ============ THEME CONFIG (the only part that differs between Eagle Eye games) ============
 const CFG = {
-  emoji: "🍔",
-  title: "Dobble Feast",
-  matchWord: "food",
-  n: 5, // projective-plane order → 6 symbols per card, 31 cards
-  symbols: ["🍎","🍌","🍇","🍉","🍓","🍒","🍍","🥭","🍑","🍋","🥝","🥕","🌽","🥦","🍅","🍆","🥑","🍞","🧀","🍕","🍔","🌮","🍟","🍩","🍪","🎂","🍦","🍫","🍿","🥨","🍭"],
-  symScale: 0.20, // symbol size as a fraction of card diameter
+  emoji: "⚡",
+  title: "Eagle Eye: Lightning",
+  matchWord: "picture",
+  n: 7, // projective-plane order → 8 symbols per card, 57 cards
+  symbols: ["⚽","🏀","🎾","🎱","🎲","🎯","🎸","🎺","🥁","🎹","🚗","🚌","🚂","🚀","✈️","🚁","⛵","🚲","⚓","🌞","🌙","⭐","⚡","🔥","❄️","🌈","☂️","☁️","🌵","🌻","🍄","🎄","🍁","🎈","🎁","👑","💎","🔑","🔒","⏰","💡","🔔","📌","✂️","🔨","🧲","🔭","🔍","📷","🕶️","🎩","👻","🤖","👽","💀","🐲","🧸"],
+  symScale: 0.155, // symbol size as a fraction of card diameter (8 per card → smaller)
   target: 7,      // points to win
   p1: { label: "Player 1", color: "#e74c3c" },
   p2: { label: "Player 2", color: "#2b8fd6" },
 };
 // =========================================================================================
 
-// ---- Dobble deck: projective plane of order n. Every pair of cards shares EXACTLY one symbol. ----
+// ---- Eagle Eye deck: projective plane of order n. Every pair of cards shares EXACTLY one symbol. ----
 function buildDeck(n) {
   const cards = [];
   for (let m = 0; m < n; m++)

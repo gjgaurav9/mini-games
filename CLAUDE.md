@@ -37,19 +37,20 @@ step, no dependencies, no frameworks. Family/kid-friendly, cozy visual style.
 `carrom-board-game` (2p White-vs-Black & 4p 2v2 partners; rotating striker baseline, Queen cover rule),
 `ludo` (2–4p; 6-to-leave-base, captures, safe squares, extra turns, home lanes),
 `snake-and-ladder` (2–4p; exact-finish, animated snake bite + slither),
-`connect-4` (2p; gravity drop + win-line),
+`drop-four` (2p; gravity drop + win-line; renamed from "Connect 4" — Hasbro trademark),
 `dots-and-boxes` (2–4p; pick grid size),
 `checkers` (2p; American rules — forced captures, multi-jumps, kings).
 
-**Dobble — head-to-head "spot it!" (2 players, split-screen, one device flat on table):**
-`dobble-animals` (Safari, 6 symbols/card), `dobble-food` (Feast, 6/card),
-`dobble-classic` (8/card). Decks are generated from a **projective plane of order n**
+**Eagle Eye — head-to-head spotting duels (2 players, split-screen, one device flat on table):**
+`eagle-eye-safari` (Safari, 6 symbols/card), `eagle-eye-feast` (Feast, 6/card),
+`eagle-eye-lightning` (8/card). **Renamed from "Dobble"** (Asmodee trademark) for sale-readiness;
+the folder slugs changed too, with redirects in `vercel.json`. Decks are generated from a **projective plane of order n**
 (`buildDeck(n)` → any two cards share exactly ONE symbol; needs `n²+n+1` symbols). Top
 half is rotated 180° for the opposite player; tap the shared symbol on your card to
 score, wrong tap = **−1** and a short freeze. All three share one templated `index.html` differing
 only in the `CFG` block (emoji/title/matchWord/n/symbols/colors) — keep them in sync.
 
-**Dobble commentary** does NOT use `Banter.say` (its toast floated over the rotated top
+**Eagle Eye commentary** does NOT use `Banter.say` (its toast floated over the rotated top
 player's card). Instead each game has a local `comment(cat)` that shows the line in the
 **neutral centre strip** (`#comment`, mirrored top/bottom so both players read it, never over
 a card) and plays **real recorded Hinglish clips** when present via the `VOICE` map — falling
@@ -74,7 +75,7 @@ names as a hint and the answer on success; Trace & Spell speaks each letter's NA
 it, the whole word ("sound it out") on completion, and re-reads on picture tap. Speech is gated
 by the shared mute flag (`localStorage miniGames.muted`). We speak letter NAMES + whole WORDS,
 not isolated phonemes — browser TTS can't make a clean `/b/` and a mangled "buh" hurts blending.
-This is the *only* place TTS lives; the board/Dobble games stay voice-free (see note below).
+This is the *only* place browser TTS lives; the board/Eagle Eye games stay TTS-free (see note below). (Eagle Eye additionally supports *recorded* Hinglish voice clips — not TTS — via `shared/commentary/`.)
 
 **Quick solo play (collecting games):**
 `apple-collecting-game`, `collect-banana`, `broccoli-collection-game`.
@@ -148,6 +149,6 @@ vercel deploy --prod --yes          # → Vercel (manual)
   not live playtest.)
 - Optional "Leave game?" confirm on the 🏠 button (currently navigates immediately).
 
-**Note:** the spoken voice was removed from the board/Dobble games and `banter.js` on purpose
+**Note:** the spoken voice was removed from the board/Eagle Eye games and `banter.js` on purpose
 — do not re-add TTS there unless asked. (Exception: the two kids' learning games `abc-missing-letter`
 and `trace-and-spell` use Web Speech TTS by explicit request — see the Learn & play section.)

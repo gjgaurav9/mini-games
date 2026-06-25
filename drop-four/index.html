@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>🔴 Connect 4 — Pass & Play</title>
+<title>🔴 Drop Four — Pass & Play</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
@@ -38,10 +38,10 @@
     <div class="pill" id="turnPill">Turn</div>
     <button id="resetBtn">↺ New</button>
   </div>
-  <div class="hint" id="hint">Tap a column to drop your disc • connect four in a row to win</div>
+  <div class="hint" id="hint">Tap a column to drop your disc • line up four in a row to win</div>
 
   <div id="startScreen" class="overlay">
-    <h1>🔴 Connect 4 🟡</h1>
+    <h1>🔴 Drop Four 🟡</h1>
     <p>Two players, one phone. Take turns dropping discs into the columns —
        first to line up <b>four in a row</b> (across, down, or diagonally) wins!</p>
     <button class="btn" id="startBtn">Start</button>
@@ -254,7 +254,7 @@ function tie() {
 
 document.getElementById("startBtn").addEventListener("click", () => {
   const slots = [{ label: "Red", color: P[1].fill }, { label: "Yellow", color: P[2].fill }];
-  Banter.askNames({ title: "Connect 4 — players?", slots }, (names) => {
+  Banter.askNames({ title: "Drop Four — players?", slots }, (names) => {
     P[1].name = names[0]; P[2].name = names[1];
     startScreen.classList.add("hidden"); newGame(); Banter.say("start", P[1].name);
   });

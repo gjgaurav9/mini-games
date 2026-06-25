@@ -1,0 +1,12 @@
+{
+  "redirects": [
+    { "source": "/dobble-animals", "destination": "/eagle-eye-safari", "permanent": true },
+    { "source": "/dobble-animals/:path*", "destination": "/eagle-eye-safari/:path*", "permanent": true },
+    { "source": "/dobble-food", "destination": "/eagle-eye-feast", "permanent": true },
+    { "source": "/dobble-food/:path*", "destination": "/eagle-eye-feast/:path*", "permanent": true },
+    { "source": "/dobble-classic", "destination": "/eagle-eye-lightning", "permanent": true },
+    { "source": "/dobble-classic/:path*", "destination": "/eagle-eye-lightning/:path*", "permanent": true },
+    { "source": "/connect-4", "destination": "/drop-four", "permanent": true },
+    { "source": "/connect-4/:path*", "destination": "/drop-four/:path*", "permanent": true }
+  ]
+}

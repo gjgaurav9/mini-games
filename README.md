@@ -15,19 +15,19 @@ Each game is a single, self-contained `index.html` (HTML5 canvas + vanilla JavaS
 | 🎯 | **[Carrom](carrom-board-game/index.html)** | 2-player (White vs Black) or 4-player (2-v-2 partners). Flick the striker to pot your colour — pot one of yours and you go again, miss and pass the phone. Cover the Queen! The striker baseline rotates to whoever's turn it is. |
 | 🎲 | **[Ludo](ludo/index.html)** | 2–4 players. Roll a 6 to leave base, race your four tokens around and up your home lane to the centre, and capture rivals by landing on them. Sixes, captures and reaching home grant an extra turn. First to get all four tokens home wins. |
 | 🐍 | **[Snakes & Ladders](snake-and-ladder/index.html)** | 2–4 players. Tap the dice, climb the ladders, slide down the snakes, and race to 100 (exact roll to finish). Roll a 6 and go again. |
-| 🔴 | **[Connect 4](connect-4/index.html)** | 2 players. Take turns dropping discs into the columns — first to line up four in a row (across, down or diagonally) wins. |
+| 🔴 | **[Drop Four](drop-four/index.html)** | 2 players. Take turns dropping discs into the columns — first to line up four in a row (across, down or diagonally) wins. |
 | ⬛ | **[Dots & Boxes](dots-and-boxes/index.html)** | 2–4 players, choose grid size. Draw one line per turn; close the fourth side of a box to claim it and go again. Most boxes wins. |
 | ♟️ | **[Checkers](checkers/index.html)** | 2 players. Diagonal moves, compulsory captures, multi-jumps and King promotion. Take all the rival's pieces (or leave them with no move) to win. |
 
-## ⚡ Dobble — head-to-head spot it! (2 players, one device)
+## 🦅 Eagle Eye — head-to-head spotting duels (2 players, one device)
 
-Lay the phone flat between you (each player's card faces them). Every two cards share **exactly ONE** matching picture — be the first to spot it and tap it on your card to score. A wrong tap **costs a point** and freezes you for a moment. First to 7 wins. The decks use a projective-plane layout, so any two cards always share precisely one symbol.
+Lay the phone flat between you (each player's card faces them). Every two cards share **exactly ONE** matching picture — be the first to spot it and tap it on your card to score. A wrong tap **costs a point** and freezes you for a moment. First to 7 wins. The decks use a projective-plane layout, so any two cards always share precisely one symbol. Commentary appears in the neutral strip between the cards (so it never blocks a card) and can speak real recorded Hinglish clips — see [`shared/commentary/`](shared/commentary/README.md).
 
 | | Game | Description |
 |---|------|-------------|
-| 🦁 | **[Dobble Safari](dobble-animals/index.html)** | 6 animals per card. Spot the one creature you both share and tap it first. |
-| 🍔 | **[Dobble Feast](dobble-food/index.html)** | 6 foods per card — fruits, snacks and treats. Grab the matching bite before your rival. |
-| ⚡ | **[Dobble Classic](dobble-classic/index.html)** | The full pack — 8 mixed symbols per card. Harder to scan, easier to fumble. |
+| 🦁 | **[Eagle Eye: Safari](eagle-eye-safari/index.html)** | 6 animals per card. Spot the one creature you both share and tap it first. |
+| 🍔 | **[Eagle Eye: Feast](eagle-eye-feast/index.html)** | 6 foods per card — fruits, snacks and treats. Grab the matching bite before your rival. |
+| ⚡ | **[Eagle Eye: Lightning](eagle-eye-lightning/index.html)** | The full pack — 8 mixed symbols per card. Harder to scan, easier to fumble. |
 
 ## 📚 Learn & play — letters & spelling (about ages 3–6)
 
