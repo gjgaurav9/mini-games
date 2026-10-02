@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>🫀 Inside Me</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%; overflow: hidden;
+    font-family: "Comic Sans MS", "Trebuchet MS", sans-serif;
+    background: #FFF4E6;
+    color: #3D405B; -webkit-user-select: none; user-select: none;
+    overscroll-behavior: none;
+  }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: stretch; }
+
+  /* ---------- organ meters ---------- */
+  .meters {
+    display: flex; gap: 4px; justify-content: center; flex-wrap: nowrap;
+    padding: calc(6px + env(safe-area-inset-top)) 6px 4px;
+  }
+  .meter {
+    flex: 1 1 0; min-width: 0; max-width: 72px;
+    background: #FFFBF4; border-radius: 12px; padding: 4px 2px 5px;
+    text-align: center; box-shadow: 0 2px 0 rgba(201,138,94,0.18);
+  }
+  .meter .mi { font-size: clamp(15px, 4.2vw, 21px); line-height: 1.1; display: block; }
+  .meter .mn { font-size: clamp(8px, 2.3vw, 10px); color: #8a7a68; display: block; margin-bottom: 2px; }
+  .bar { display: block; height: 5px; border-radius: 4px; background: #F0E2CE; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; border-radius: 4px; transition: width .5s ease-out; }
+
+  /* ---------- body canvas ---------- */
+  .stage { flex: 1; min-height: 0; position: relative; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+
+  /* ---------- discovery caption ---------- */
+  .caption {
+    position: absolute; left: 8px; right: 8px; bottom: 6px;
+    background: rgba(255,251,244,0.95); border-radius: 14px;
+    padding: 8px 12px; text-align: center;
+    font-size: clamp(13px, 3.6vw, 17px); line-height: 1.35; color: #3D405B;
+    box-shadow: 0 4px 14px rgba(201,138,94,0.22);
+    opacity: 0; transform: translateY(8px); transition: opacity .25s, transform .25s;
+    pointer-events: none;
+  }
+  .caption.show { opacity: 1; transform: translateY(0); }
+  .caption b { color: #D97706; }
+
+  /* ---------- plate ---------- */
+  .plate {
+    display: flex; gap: 5px; justify-content: center; align-items: center;
+    padding: 5px 8px 2px;
+  }
+  .slot {
+    width: clamp(34px, 9.5vw, 46px); height: clamp(34px, 9.5vw, 46px);
+    border-radius: 12px; background: #FFFBF4;
+    border: 2px dashed #E3CDB0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(18px, 5vw, 26px);
+  }
+  .slot.fun { border-style: solid; border-color: #FFD98A; background: #FFF7E3; }
+  .slot.full { border-style: solid; border-color: #7FD1A0; background: #F2FBF6; }
+
+  /* ---------- food tray ---------- */
+  .tray {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+    padding: 4px 8px calc(62px + env(safe-area-inset-bottom));
+  }
+  .food {
+    background: #FFFBF4; border: none; border-radius: 14px;
+    padding: 6px 2px 5px; cursor: pointer; font-family: inherit;
+    box-shadow: 0 3px 0 rgba(201,138,94,0.25);
+    display: flex; flex-direction: column; align-items: center; gap: 1px;
+    min-height: 56px;
+  }
+  .food:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(201,138,94,0.25); }
+  .food .fe { font-size: clamp(21px, 6vw, 30px); line-height: 1.1; }
+  .food .fn { font-size: clamp(9px, 2.6vw, 11px); color: #6b5c4b; line-height: 1.15; }
+  .food[disabled] { opacity: .35; }
+
+  /* ---------- buttons / overlay ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; background: rgba(61,64,91,0.55); padding: 18px; }
+  .overlay.hide { display: none; }
+  .panel {
+    background: #FFFBF4; border-radius: 24px; padding: 22px 20px;
+    max-width: 430px; width: 100%; text-align: center;
+    box-shadow: 0 18px 44px rgba(61,64,91,0.4);
+    max-height: 92vh; overflow-y: auto;
+  }
+  .panel .big { font-size: clamp(46px, 13vw, 76px); line-height: 1.1; }
+  .panel h1 { font-size: clamp(23px, 5.6vw, 32px); margin: 4px 0 2px; }
+  .panel p { font-size: clamp(13px, 3.4vw, 16px); color: #6b5c4b; margin: 8px 0; line-height: 1.5; }
+  .panel .go {
+    margin-top: 12px; width: 100%; padding: 14px; border: none; border-radius: 15px;
+    font-family: inherit; font-size: clamp(18px, 4.8vw, 23px); font-weight: bold;
+    cursor: pointer; background: #5BC0BE; color: #fff; box-shadow: 0 5px 0 #3E9A98;
+  }
+  .panel .go:active { transform: translateY(3px); box-shadow: 0 2px 0 #3E9A98; }
+  .panel .go.alt { background: #F2A65A; box-shadow: 0 5px 0 #C97F38; }
+  .stars { font-size: clamp(30px, 9vw, 46px); letter-spacing: 4px; margin: 4px 0; }
+  .groupRow { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
+  .gchip {
+    font-size: clamp(12px, 3.2vw, 15px); padding: 5px 10px; border-radius: 20px;
+    background: #F0E2CE; color: #8a7a68;
+  }
+  .gchip.got { background: #D8F3E4; color: #2f7d5a; }
+  .pick { display: flex; gap: 8px; justify-content: center; margin: 12px 0 4px; }
+  .pickBtn {
+    flex: 1; background: #FFF7E3; border: 2px solid #FFD98A; border-radius: 15px;
+    padding: 10px 4px; cursor: pointer; font-family: inherit;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  .pickBtn.sel { background: #D8F3E4; border-color: #7FD1A0; }
+  .pickBtn .pe { font-size: clamp(26px, 7vw, 36px); }
+  .pickBtn .pn { font-size: clamp(10px, 2.8vw, 12px); color: #6b5c4b; }
+  .grown {
+    position: absolute; top: 4px; right: 6px;
+    z-index: 40; background: rgba(255,251,244,0.9); border: none;
+    border-radius: 50%; width: 26px; height: 26px; font-size: 13px;
+    cursor: pointer; color: #8a7a68; font-family: inherit;
+  }
+  .panel .fine { font-size: clamp(11px, 2.9vw, 13px); color: #8a7a68; text-align: left; line-height: 1.55; }
+  .panel .fine b { color: #3D405B; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="meters" id="meters"></div>
+  <div class="stage">
+    <canvas id="c"></canvas>
+    <div class="caption" id="caption"></div>
+    <button class="grown" id="grownBtn" aria-label="For grown-ups">i</button>
+  </div>
+  <div class="plate" id="plate"></div>
+  <div class="tray" id="tray"></div>
+</div>
+<div class="overlay" id="overlay"><div class="panel" id="panel"></div></div>
+
+<script src="../shared/banter.js"></script>
+<script>
+"use strict";
+/* ============================================================================
+   INSIDE ME — feed a body, watch what happens inside.
+
+   LANGUAGE RULES (deliberate, research-backed — please keep them):
+   Foods are never "good"/"bad"/"junk"/"unhealthy". They are "everyday foods"
+   and "sometimes foods", which describes HOW OFTEN we eat them, not whether
+   the child is being good. Moralised food language is a documented risk
+   factor for disordered eating, and Go/Slow/Whoa-style traffic lights were
+   publicly criticised after children named them as a trigger.
+   Nothing here ever subtracts points, shows a frown, or makes the body sad.
+
+   A nutrient's benefit is revealed AFTER eating as a discovery, never used
+   beforehand as a reason to eat. Maimaran & Fishbach (JCR 2014) found
+   preschoolers told crackers would "make them strong" ate about HALF as many.
+
+   No calories, no weight, no body-size change anywhere. (AAP 2016.)
+   ========================================================================== */
+
+/* ---- organ meters: the "toolkit" a body collects ---- */
+const ORGANS = [
+  { k:"build", i:"💪", n:"Build",  col:"#E8907E" },
+  { k:"bones", i:"🦴", n:"Bones",  col:"#E8C98A" },
+  { k:"brain", i:"🧠", n:"Brain",  col:"#F6A8C0" },
+  { k:"eyes",  i:"👀", n:"Eyes",   col:"#F2A65A" },
+  { k:"tummy", i:"🌀", n:"Tummy",  col:"#9BE564" },
+  { k:"water", i:"💧", n:"Water",  col:"#6FD6E8" },
+];
+
+const GROUPS = {
+  veg:     { i:"🥬", n:"Veg" },
+  fruit:   { i:"🍎", n:"Fruit" },
+  grain:   { i:"🌾", n:"Grain" },
+  protein: { i:"🫘", n:"Protein" },
+  dairy:   { i:"🥛", n:"Dairy" },
+};
+
+/* ---- the food table ----
+   e=emoji  fb=fallback emoji if the glyph is missing on this device
+   g=group  c=rainbow colour  gives=organ meters it fills
+   vc=true  -> rich in vitamin C, unlocks the iron combo
+   fe=true  -> plant iron, boosted by a vitamin C food on the same plate
+   fat=true -> has fat, helps vitamin A from orange veg get absorbed
+   sug=teaspoons of added sugar   salt=true   slow=true (fat slows the stomach)
+   line = the discovery, spoken aloud. Short, concrete, never a reason-to-eat. */
+const FOODS = [
+  // ---------------- fruit ----------------
+  { e:"🍎", n:"Apple",     g:"fruit", c:"red",    gives:["tummy"],
+    line:"Crunch! The fibre sweeps your food pipe clean." },
+  { e:"🍌", n:"Banana",    g:"fruit", c:"white",  gives:["build"],
+    line:"Potassium! Your muscles use it to squeeze." },
+  { e:"🍊", n:"Orange",    g:"fruit", c:"orange", gives:[], vc:true,
+    line:"Zingy! Vitamin C builds the glue that holds skin together." },
+  { e:"🥭", n:"Mango",     g:"fruit", c:"orange", gives:["eyes"],
+    line:"Sweet! Vitamin A helps your eyes see in dim light." },
+  { e:"🍉", n:"Melon",     g:"fruit", c:"red",    gives:["water"],
+    line:"Juicy! This fruit is almost all water." },
+  { e:"🍓", n:"Berry",     g:"fruit", c:"red",    gives:[], vc:true,
+    line:"Tiny and tart! Packed with vitamin C." },
+  { e:"🍇", n:"Grapes",    g:"fruit", c:"purple", gives:["water"],
+    line:"Pop! Purple skins carry anthocyanins." },
+  // ---------------- veg ----------------
+  { e:"🥕", n:"Carrot",    g:"veg",   c:"orange", gives:["eyes"],
+    line:"Snap! Your body turns this orange colour into vitamin A." },
+  { e:"🥦", n:"Broccoli",  g:"veg",   c:"green",  gives:["tummy"], vc:true,
+    line:"Little trees! Fibre plus vitamin C." },
+  { e:"🍅", n:"Tomato",    g:"veg",   c:"red",    gives:[], vc:true,
+    line:"Squishy and red! Lycopene makes it that colour." },
+  { e:"🥬", n:"Palak",     g:"veg",   c:"green",  gives:["eyes"],
+    line:"Leafy! Lots of vitamin A and folate." },
+  { e:"🌽", n:"Corn",      g:"veg",   c:"white",  gives:["tummy"],
+    line:"Sweet kernels! More fibre for your gut." },
+  { e:"🥔", n:"Potato",    g:"veg",   c:"white",  gives:["build"],
+    line:"Boiled soft! More potassium than a banana." },
+  { e:"🍠", n:"Sweet pot", g:"veg",   c:"orange", gives:["eyes","tummy"],
+    line:"Orange inside! The most vitamin A on the whole tray." },
+  // ---------------- grain ----------------
+  { e:"🫓", fb:"🍞", n:"Roti", g:"grain", c:"white", gives:["brain"],
+    line:"Warm and soft! Slow fuel your brain can use all morning." },
+  { e:"🍚", n:"Rice",      g:"grain", c:"white",  gives:["brain"],
+    line:"Fluffy! Your brain runs on steady glucose." },
+  { e:"🍞", n:"Brown bread", g:"grain", c:"white", gives:["brain","tummy"],
+    line:"Whole grain keeps the bran, so the fibre stays in." },
+  { e:"🥣", n:"Oats",      g:"grain", c:"white",  gives:["tummy","brain"],
+    line:"Creamy! Soft fibre feeds the good bugs in your gut." },
+  // ---------------- protein ----------------
+  { e:"🫘", fb:"🥣", n:"Rajma", g:"protein", c:"red", gives:["build","tummy"], fe:true,
+    line:"Beans! Protein to build with, and plant iron." },
+  { e:"🥚", n:"Egg",       g:"protein", c:"white", gives:["build","brain"],
+    line:"Protein repairs the bits you wore out playing." },
+  { e:"🥜", n:"Peanuts",   g:"protein", c:"brown", gives:["build","brain"], fat:true,
+    line:"Crunchy! Protein plus the fat your brain is built from." },
+  { e:"🌰", n:"Almonds",   g:"protein", c:"brown", gives:["brain"], fat:true,
+    line:"Snap! Good fats and vitamin E." },
+  { e:"🐟", n:"Fish",      g:"protein", c:"blue",  gives:["brain","build"], fat:true,
+    line:"Omega-3 is a building block of your brain cells." },
+  { e:"🍛", n:"Dal chawal", g:"protein", c:"white", gives:["build","brain"], fe:true, combo:"dalrice",
+    line:"Dal and rice together make a complete protein!" },
+  // ---------------- dairy ----------------
+  { e:"🥛", n:"Milk",      g:"dairy", c:"white", gives:["bones","build"],
+    line:"Calcium is the cement for your bones and teeth." },
+  { e:"🧀", n:"Paneer",    g:"dairy", c:"white", gives:["bones","build"],
+    line:"Soft and milky! Calcium and protein together." },
+  { e:"🥣", n:"Dahi",      g:"dairy", c:"white", gives:["bones","tummy"],
+    line:"Cool and creamy! Live cultures join the bugs in your gut." },
+  { e:"🧈", n:"Ghee",      g:"dairy", c:"white", gives:[], fat:true,
+    line:"A little fat helps vitamins A and D get in at all." },
+  // ---------------- water ----------------
+  { e:"💧", n:"Water",     g:"water", c:"blue", gives:["water"],
+    line:"Ahh! Water carries everything around and cools you down." },
+  { e:"🥥", n:"Nariyal",   g:"water", c:"white", gives:["water","build"],
+    line:"Coconut water! Natural potassium for your muscles." },
+  // ---------------- sometimes foods ----------------
+  // Kept deliberately few. Research on advergames found children who played
+  // ANY food-themed game ate more afterwards, including more sweets, even when
+  // the game showed fruit. So these are present and honest, never the fun part.
+  { e:"🥤", n:"Cola",   g:"sometimes", c:"brown", sug:9, teeth:1,
+    line:"Fizzy! About nine spoons of sugar.", after:"energy" },
+  { e:"🍬", n:"Toffee", g:"sometimes", c:"red",   sug:5, teeth:1.6, sticky:true,
+    line:"Sweet and sticky! It clings to your teeth longer.", after:"teeth" },
+  { e:"🍫", n:"Chocolate", g:"sometimes", c:"brown", sug:6, teeth:1,
+    line:"Smooth and sweet! Some milk in there too.", after:"energy" },
+  { e:"🍪", n:"Biscuit", g:"sometimes", c:"brown", sug:2.5, teeth:1,
+    line:"Crumbly! The starch feeds the same mouth bugs sugar does.", after:"teeth" },
+  { e:"🍟", n:"Fries",  g:"sometimes", c:"white", salt:true, slow:true,
+    line:"Hot and salty! Fat slows your stomach's exit valve.", after:"slow" },
+  { e:"🍔", n:"Burger", g:"sometimes", c:"brown", salt:true, slow:true, gives:["build"],
+    line:"Real protein in there, and a lot of salt.", after:"salt" },
+  { e:"🍦", n:"Ice cream", g:"sometimes", c:"white", sug:3.5, teeth:1,
+    line:"Cold and creamy! Milk and sugar together.", after:"energy" },
+  // The two most valuable foods in the whole game: they look like everyday
+  // foods and are not. This "it depends" nuance is what every competing
+  // nutrition game was criticised for lacking.
+  { e:"🧃", n:"Juice box", g:"sometimes", c:"orange", sug:4, teeth:1, halo:true,
+    line:"Looks like fruit! But the fibre is gone and the sugar is loose.", after:"halo" },
+  { e:"🧋", fb:"🥤", n:"Sweet lassi", g:"sometimes", c:"white", sug:5, teeth:1, gives:["bones"], halo:true,
+    line:"Real milk AND real sugar — this one is both at once.", after:"halo" },
+];
+
+/* ============================ palette ============================ */
+const C = {
+  bg:"#FFF4E6", vig:"#F3D9BC",
+  skin:"rgba(255,217,184,0.40)", skinSolid:"#FFD9B8", ink:"#C98A5E",
+  hair:"#6B4A33", hairHi:"#8A6245",
+  heart:"#FF6B81", heartHi:"#FF9FAE",
+  lung:"#F7A8A8", lungHi:"#F6D1D1",
+  stom:"#F2A65A", stomHi:"#FBD7AE", chyme:"#E88C3A",
+  gut:"#F6B3A0", gutRim:"#D98B78", gutHi:"#FFD6C9",
+  brain:"#F6A8C0", brainFold:"#E2869F", brainHi:"#FFC9DB",
+  bone:"#FFF8EC", boneSh:"#E6D7BE",
+  muscle:"#E8907E",
+};
+
+/* ============================ design space ============================ */
+const W = 360, H = 620, CX = 180;
+const cv = document.getElementById("c");
+let ctx = cv.getContext("2d");
+let fit = 1, offX = 0, offY = 0, DPR = 1;
+let T = 0, lastTs = 0;
+let reduced = false;
+try { reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch(e){}
+
+/* ============================ small helpers ============================ */
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0;
+  let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t;
+  return ((t^t>>>14)>>>0)/4294967296; }; }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function clamp01(v){ return v<0?0:v>1?1:v; }
+function easeOutBack(t){ const s=1.70158; return 1+(s+1)*Math.pow(t-1,3)+s*Math.pow(t-1,2); }
+function rr(g,x,y,w,h,r){ if (g.roundRect) { g.beginPath(); g.roundRect(x,y,w,h,r); }
+  else { g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
+         g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); } }
+
+/* Breathing: inhale fast (40% of cycle), exhale slow (60%). A plain sine
+   reads as "floating"; this reads as alive. Range exactly 0..1. */
+const BREATH_HZ = 0.30;                       // ~18 breaths/min, a resting child
+function breath(t){
+  const p = ((t * BREATH_HZ) % 1 + 1) % 1;
+  return p < 0.40 ? 0.5 - 0.5*Math.cos(Math.PI*(p/0.40))
+                  : 0.5 + 0.5*Math.cos(Math.PI*((p-0.40)/0.60));
+}
+/* Heart: two sharp thumps then a long quiet diastole. Not a sine. */
+function thump(x){
+  if (x <= 0 || x >= 1) return 0;
+  const a = 0.26;
+  return x < a ? 1-(1-x/a)*(1-x/a) : (1+Math.cos(Math.PI*(x-a)/(1-a)))/2;
+}
+function heartBeat(t, bpm){
+  const p = ((t*(bpm/60)) % 1 + 1) % 1;
+  return thump(p/0.14)*1.00 + thump((p-0.28)/0.11)*0.55;
+}
+function bob(t){ return reduced ? 0 : Math.sin(t*2*Math.PI*0.18)*2.4 + Math.sin(t*2*Math.PI*0.47)*0.6; }
+function sway(t){ return reduced ? 0 : Math.sin(t*2*Math.PI*0.13)*0.012; }
+
+/* Blink: scheduled, never periodic. Humans blink every 2-6s for ~150ms. */
+const blink = { next: 2.0, t: -1, dbl: false };
+function updateBlink(dt){
+  if (blink.t >= 0){
+    blink.t += dt;
+    if (blink.t > 0.17){
+      blink.t = -1;
+      if (!blink.dbl && Math.random() < 0.2){ blink.dbl = true; blink.next = 0.22; }
+      else { blink.dbl = false; blink.next = 2.5 + Math.random()*3.5; }
+    }
+  } else { blink.next -= dt; if (blink.next <= 0) blink.t = 0; }
+}
+function eyeOpen(){
+  if (blink.t < 0) return 1;
+  const c = 0.07, o = 0.10;
+  return blink.t < c ? 1 - blink.t/c : Math.min(1, (blink.t-c)/o);
+}
+
+/* ============================ body outline ============================ */
+/* One half written as offsets from the centre line, then mirrored, so the
+   figure is exactly symmetric and closes on itself. ~5 head-heights tall. */
+const TORSO = [
+  [ 34,186,   64,190,   78,212],
+  [ 92,232,   94,258,   88,286],
+  [ 82,312,   70,318,   66,334],
+  [ 62,352,   74,368,   80,392],
+  [ 84,410,   76,426,   58,432],
+];
+function traceMirrored(p, segs, topY){
+  p.moveTo(CX, topY);
+  for (const s of segs) p.bezierCurveTo(CX+s[0],s[1], CX+s[2],s[3], CX+s[4],s[5]);
+  const last = segs[segs.length-1];
+  p.lineTo(CX - last[4], last[5]);
+  for (let i = segs.length-1; i >= 0; i--){
+    const s = segs[i], prev = i ? segs[i-1] : null;
+    const ex = prev ? CX - prev[4] : CX, ey = prev ? prev[5] : topY;
+    p.bezierCurveTo(CX-s[2],s[3], CX-s[0],s[1], ex, ey);
+  }
+  p.closePath();
+}
+let torsoPath = null;
+function buildTorso(){ torsoPath = new Path2D(); traceMirrored(torsoPath, TORSO, 182); }
+
+/* ============================ organ paths ============================ */
+function stomachPath(){
+  const p = new Path2D();
+  p.moveTo(0,0);
+  p.bezierCurveTo( 34,  6,  54, 26,  56, 56);
+  p.bezierCurveTo( 58, 92,  34,118,   2,118);
+  p.bezierCurveTo(-24,118, -42,100, -44, 76);
+  p.bezierCurveTo(-46, 54, -30, 46, -16, 44);   // the J notch — this is what
+  p.bezierCurveTo( -4, 42,  -2, 22,   0,  0);   // makes it read "stomach"
+  p.closePath(); return p;
+}
+const STOM = stomachPath();
+const STOM_X = 170, STOM_Y = 276, STOM_S = 0.72;
+
+function coilPoints(x, y, w, h, rows, seed){
+  const rnd = mulberry32(seed), pts = [], dy = h/(rows-1);
+  for (let i = 0; i < rows; i++){
+    const left = i % 2 === 0;
+    const x0 = left ? x : x+w, x1 = left ? x+w : x;
+    for (let k = 0; k <= 4; k++){
+      const u = k/4;
+      pts.push({ x: x0 + (x1-x0)*u + (rnd()-0.5)*7,
+                 y: y + i*dy + Math.sin(u*Math.PI)*dy*0.22 + (rnd()-0.5)*4 });
+    }
+    if (i < rows-1) pts.push({ x: x1 + (left ? 14 : -14), y: y + i*dy + dy*0.5 });
+  }
+  return pts;
+}
+function catmullPath(pts, tension){
+  const p = new Path2D(), k = (tension||1)/6;
+  p.moveTo(pts[0].x, pts[0].y);
+  for (let i = 0; i < pts.length-1; i++){
+    const p0=pts[i-1]||pts[i], p1=pts[i], p2=pts[i+1], p3=pts[i+2]||pts[i+1];
+    p.bezierCurveTo(p1.x+(p2.x-p0.x)*k, p1.y+(p2.y-p0.y)*k,
+                    p2.x-(p3.x-p1.x)*k, p2.y-(p3.y-p1.y)*k, p2.x, p2.y);
+  }
+  return p;
+}
+const GUT_PTS  = coilPoints(132, 368, 96, 54, 4, 1337);
+const GUT_PATH = catmullPath(GUT_PTS, 1);
+
+function drawTube(g, path, outer, inner, cOuter, cInner, cHi){
+  g.lineCap="round"; g.lineJoin="round";
+  g.strokeStyle=cOuter; g.lineWidth=outer; g.stroke(path);
+  g.strokeStyle=cInner; g.lineWidth=inner; g.stroke(path);
+  g.save(); g.translate(0, -inner*0.22);
+  g.strokeStyle=cHi; g.lineWidth=inner*0.3; g.globalAlpha=0.55; g.stroke(path);
+  g.restore(); g.globalAlpha=1;
+}
+
+/* ============================ baked static art ============================ */
+let bakedSkel = null, bakedGut = null, bakedBrain = null;
+function bake(w, h, drawFn){
+  const c = document.createElement("canvas");
+  const s = Math.max(0.5, fit) * DPR;
+  c.width = Math.max(1, Math.ceil(w*s)); c.height = Math.max(1, Math.ceil(h*s));
+  const g = c.getContext("2d");
+  g.setTransform(s, 0, 0, s, 0, 0);
+  g.lineCap = "round"; g.lineJoin = "round";
+  drawFn(g);
+  return { c:c, w:w, h:h };
+}
+function blit(g, b, x, y){ if (b) g.drawImage(b.c, 0,0,b.c.width,b.c.height, x,y, b.w,b.h); }
+
+function bakeAll(){
+  /* ribcage + spine. 8 pairs reads skeletal/spooky; 6 chunky pairs reads cartoon.
+     Bone is warm ivory, never grey — grey bone reads Halloween. */
+  bakedSkel = bake(W, 460, function(g){
+    const pairs = 6, topY = 206;
+    for (let pass = 0; pass < 2; pass++){
+      g.strokeStyle = pass ? C.bone : C.boneSh;
+      g.lineWidth = pass ? 9 : 12;
+      for (let i = 0; i < pairs; i++){
+        const y = topY + i*21;
+        const w = 42 + 34*Math.sin(Math.PI*(i+1.1)/(pairs+1.6));
+        const dr = 20 + i*2.0;
+        for (const s of [1,-1]){
+          g.beginPath(); g.moveTo(CX + s*7, y);
+          g.quadraticCurveTo(CX + s*w*1.06, y+3, CX + s*w*0.54, y+dr);
+          g.stroke();
+        }
+      }
+    }
+    rr(g, CX-9, 212, 18, 68, 9); g.fillStyle = C.bone; g.fill();
+    g.strokeStyle = C.boneSh; g.lineWidth = 1.5; g.stroke();
+    const n = 11, y0 = 196, y1 = 428;
+    for (let i = 0; i < n; i++){
+      const u=i/(n-1), y=y0+(y1-y0)*u, w=15-4*u, h=(y1-y0)/n-3;
+      rr(g, CX-w/2, y, w, h, 4);
+      g.fillStyle = C.bone; g.fill();
+      g.strokeStyle = C.boneSh; g.lineWidth = 1.5; g.stroke();
+    }
+  });
+
+  bakedGut = bake(W, 460, function(g){
+    drawTube(g, GUT_PATH, 20, 15, C.gutRim, C.gut, C.gutHi);
+  });
+
+  /* brain folds: clip to the bean, then scribble inside. The periodic bias on
+     the random walk is what gives real gyral waviness instead of spaghetti. */
+  bakedBrain = bake(W, 180, function(g){
+    const bean = new Path2D();
+    bean.ellipse(CX, 78, 43, 23, 0, 0, Math.PI*2);
+    g.fillStyle = C.brain; g.fill(bean);
+    const rnd = mulberry32(99);
+    g.save(); g.clip(bean);
+    for (let b = 0; b < 12; b++){
+      let px = CX-43 + rnd()*86, py = 56 + rnd()*44, a = rnd()*Math.PI*2;
+      g.beginPath(); g.moveTo(px, py);
+      for (let i = 0; i < 9; i++){
+        a += (rnd()-0.5)*1.0 + Math.sin(i*0.9 + b)*0.40;
+        const nx = px + Math.cos(a)*6, ny = py + Math.sin(a)*6;
+        g.quadraticCurveTo(px, py, (px+nx)/2, (py+ny)/2);
+        px = nx; py = ny;
+      }
+      g.strokeStyle = C.brainFold; g.lineWidth = 5; g.stroke();
+      g.strokeStyle = C.brainHi;   g.lineWidth = 2;
+      g.save(); g.translate(0,-1.4); g.stroke(); g.restore();
+    }
+    g.restore();
+  });
+}
+
+/* ============================ glow (no ctx.filter) ============================
+   ctx.filter='blur()' is unsupported on iOS Safari and flag-disabled on 18+,
+   and shadowBlur costs a full blur pass per draw call. Pre-baked radial
+   sprites drawn with 'lighter' look the same and are ~10x cheaper. */
+const GLOW = {};
+function makeGlowSprite(size, rgb){
+  const c = document.createElement("canvas"); c.width = c.height = size;
+  const g = c.getContext("2d"), r = size/2;
+  const grad = g.createRadialGradient(r,r,0, r,r,r);
+  grad.addColorStop(0.00, "rgba("+rgb+",1)");
+  grad.addColorStop(0.25, "rgba("+rgb+",0.55)");
+  grad.addColorStop(1.00, "rgba("+rgb+",0)");
+  g.fillStyle = grad; g.fillRect(0,0,size,size);
+  return c;
+}
+function buildGlows(){
+  GLOW.gold  = makeGlowSprite(48, "255,224,102");
+  GLOW.green = makeGlowSprite(48, "155,229,100");
+  GLOW.blue  = makeGlowSprite(48, "111,214,232");
+  GLOW.pink  = makeGlowSprite(48, "255,159,174");
+  GLOW.cream = makeGlowSprite(48, "255,248,236");
+}
+const ORGAN_TINT = { build:"pink", bones:"cream", brain:"pink", eyes:"gold", tummy:"green", water:"blue" };
+
+/* ============================ flow paths ============================ */
+function makeFlow(pts, samples){
+  samples = samples || 160;
+  const p = [], L = [0], k = 1/6;
+  for (let i = 0; i < pts.length-1; i++){
+    const p0=pts[i-1]||pts[i], p1=pts[i], p2=pts[i+1], p3=pts[i+2]||pts[i+1];
+    const c1x=p1.x+(p2.x-p0.x)*k, c1y=p1.y+(p2.y-p0.y)*k;
+    const c2x=p2.x-(p3.x-p1.x)*k, c2y=p2.y-(p3.y-p1.y)*k;
+    const n = Math.ceil(samples/(pts.length-1));
+    for (let j=0;j<n;j++){ const t=j/n, u=1-t;
+      p.push({ x:u*u*u*p1.x+3*u*u*t*c1x+3*u*t*t*c2x+t*t*t*p2.x,
+               y:u*u*u*p1.y+3*u*u*t*c1y+3*u*t*t*c2y+t*t*t*p2.y }); }
+  }
+  p.push(pts[pts.length-1]);
+  for (let i=1;i<p.length;i++) L[i]=L[i-1]+Math.hypot(p[i].x-p[i-1].x,p[i].y-p[i-1].y);
+  const total = L[L.length-1] || 1;
+  return { total:total, at:function(s){
+    const d = clamp01(s)*total;
+    let lo=0, hi=L.length-1;
+    while (hi-lo>1){ const m=(lo+hi)>>1; if (L[m]<=d) lo=m; else hi=m; }
+    const f=(d-L[lo])/((L[hi]-L[lo])||1);
+    return { x:p[lo].x+(p[hi].x-p[lo].x)*f, y:p[lo].y+(p[hi].y-p[lo].y)*f,
+             a:Math.atan2(p[hi].y-p[lo].y,p[hi].x-p[lo].x) };
+  }};
+}
+const TARGET = {
+  build:{x:258,y:300}, bones:{x:180,y:250}, brain:{x:180,y:78},
+  eyes:{x:180,y:120},  tummy:{x:180,y:394}, water:{x:180,y:330},
+};
+const FLOW = {};
+function buildFlows(){
+  const ex = {x:172,y:350};
+  FLOW.build = makeFlow([ex,{x:205,y:338},{x:240,y:316},TARGET.build]);
+  FLOW.bones = makeFlow([ex,{x:188,y:312},{x:183,y:278},TARGET.bones]);
+  FLOW.brain = makeFlow([ex,{x:176,y:282},{x:180,y:180},TARGET.brain]);
+  FLOW.eyes  = makeFlow([ex,{x:178,y:286},{x:181,y:192},TARGET.eyes]);
+  FLOW.tummy = makeFlow([ex,{x:168,y:366},{x:176,y:384},TARGET.tummy]);
+  FLOW.water = makeFlow([ex,{x:175,y:342},TARGET.water]);
+}
+
+/* ============================ particles ============================ */
+const MAX_P = 90;
+let pool = [];
+let fpsEma = 16;
+function spawnP(organ){
+  const flow = FLOW[organ]; if (!flow) return;
+  const cap = fpsEma > 24 ? 40 : fpsEma > 19 ? 65 : MAX_P;
+  if (pool.length >= cap) return;
+  pool.push({ flow:flow, tint:ORGAN_TINT[organ]||"gold", organ:organ,
+              s:0, v:0.34+Math.random()*0.20, r:5+Math.random()*4, ph:Math.random()*6.28 });
+}
+function drawParticles(g, dt){
+  const trail = (reduced || fpsEma > 19) ? 2 : 3;
+  g.globalCompositeOperation = "lighter";
+  for (let i = pool.length-1; i >= 0; i--){
+    const q = pool[i];
+    q.s += q.v*dt;
+    if (q.s >= 1){ pool.splice(i,1); pulseOrgan(q.organ); continue; }
+    for (let k = trail-1; k >= 0; k--){
+      const pt = q.flow.at(q.s - k*0.013);
+      const w  = q.r * (1 - k*0.17);
+      const nx = Math.cos(pt.a+Math.PI/2), ny = Math.sin(pt.a+Math.PI/2);
+      const off = Math.sin(T*6 + q.ph)*3;
+      g.globalAlpha = (k===0 ? 0.95 : 0.30 - k*0.07);
+      g.drawImage(GLOW[q.tint], pt.x+nx*off-w, pt.y+ny*off-w, w*2, w*2);
+    }
+  }
+  g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
+}
+
+/* ============================ live body state ============================ */
+const organGlow = { build:0, bones:0, brain:0, eyes:0, tummy:0, water:0 };
+function pulseOrgan(k){ if (k in organGlow) organGlow[k] = Math.min(1.4, organGlow[k]+0.5); }
+let bpm = 92, bpmTarget = 92;
+let stomachLevel = 0, churn = 0;
+let squashT = -1;            // head squash on chewing
+let bulgeT = -1;             // throat bulge on swallowing
+let flying = null;           // food emoji in transit
+const shake = { t:0, dur:0.35, amp:0 };
+function kick(amp){ if (reduced) return; shake.amp = Math.min(amp, 6); shake.dur = 0.35; shake.t = 0.35; }
+function squashCurve(t){ const e = Math.sin(Math.PI*t)*Math.exp(-2.6*t); return { sx:1+0.22*e, sy:1-0.18*e }; }
+
+/* ============================ resize ============================ */
+let lastCW = 0, lastCH = 0;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = cv.clientWidth, ch = cv.clientHeight;
+  if (!cw || !ch) return;
+  lastCW = cw; lastCH = ch;
+  cv.width = Math.round(cw*DPR); cv.height = Math.round(ch*DPR);
+  ctx = cv.getContext("2d");
+  fit = Math.min(cw/W, ch/H);
+  offX = (cw - W*fit)/2; offY = (ch - H*fit)/2;
+  bakeAll();
+}
+
+/* ============================ draw ============================ */
+function draw(dt){
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.save();
+  if (shake.t > 0){
+    shake.t -= dt;
+    const k = shake.amp*Math.pow(Math.max(0,shake.t)/shake.dur, 2);
+    ctx.translate((Math.random()*2-1)*k, (Math.random()*2-1)*k);
+  }
+  ctx.translate(offX, offY); ctx.scale(fit, fit);
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+
+  const b  = breath(T);
+  const hb = heartBeat(T, bpm);
+  const by = bob(T);
+
+  ctx.save();
+  ctx.translate(CX, 534); ctx.rotate(sway(T)); ctx.translate(-CX, -534 + by);
+
+  /* --- aura: rim glow when the body is well watered --- */
+  const aura = organGlow.water*0.5 + (meters.water/100)*0.35;
+  if (aura > 0.02){
+    ctx.globalCompositeOperation = "lighter";
+    const steps = [[34,0.030],[23,0.055],[14,0.085]];
+    for (let i=0;i<steps.length;i++){
+      ctx.lineWidth = steps[i][0];
+      ctx.strokeStyle = "rgba(255,240,200," + (steps[i][1]*aura).toFixed(3) + ")";
+      ctx.stroke(torsoPath);
+    }
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  /* --- limbs (behind the torso) --- */
+  function limb(ax,ay,bx,by2,cx2,cy,w0,w1){
+    ctx.strokeStyle = C.skinSolid;
+    ctx.beginPath(); ctx.moveTo(ax,ay); ctx.quadraticCurveTo(bx,by2,cx2,cy);
+    ctx.lineWidth = w0; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo((ax+bx)/2,(ay+by2)/2); ctx.quadraticCurveTo(bx,by2,cx2,cy);
+    ctx.lineWidth = w1; ctx.stroke();
+  }
+  const flex = organGlow.build;
+  limb(262,214, 292,300, 288-flex*6,392, 30+flex*5, 24+flex*4);
+  limb(98,214,  68,300,  72+flex*6,392, 30+flex*5, 24+flex*4);
+  limb(214,424, 230,486, 222,530, 40, 30);
+  limb(146,424, 130,486, 138,530, 40, 30);
+  ctx.fillStyle = "#F7C9A3"; ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
+  [[288,400],[72,400]].forEach(function(h){ ctx.beginPath(); ctx.ellipse(h[0],h[1],13,13,0,0,6.2832); ctx.fill(); ctx.stroke(); });
+  [[224,534],[136,534]].forEach(function(f){ ctx.beginPath(); ctx.ellipse(f[0],f[1],20,11,0,0,6.2832); ctx.fill(); ctx.stroke(); });
+
+  /* --- skeleton --- */
+  ctx.save();
+  if (organGlow.bones > 0.01){
+    ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = organGlow.bones*0.5;
+    ctx.drawImage(GLOW.cream, TARGET.bones.x-70, TARGET.bones.y-70, 140, 140);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+  }
+  blit(ctx, bakedSkel, 0, 0);
+  ctx.restore();
+
+  /* --- lungs (move far more than the skin does) --- */
+  const lsx = 1+0.05*b, lsy = 1+0.11*b;
+  ctx.fillStyle = C.lung;
+  [[148,1],[208,-1]].forEach(function(L){
+    ctx.save(); ctx.translate(L[0],236); ctx.scale(lsx,lsy);
+    ctx.beginPath();
+    ctx.moveTo(0,-30);
+    ctx.bezierCurveTo(20*L[1],-26, 26*L[1],-2, 22*L[1],24);
+    ctx.bezierCurveTo(19*L[1],40, 4*L[1],44, -4*L[1],36);
+    ctx.bezierCurveTo(-12*L[1],28, -14*L[1],4, -10*L[1],-14);
+    ctx.bezierCurveTo(-8*L[1],-24, -5*L[1],-29, 0,-30);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  });
+  ctx.strokeStyle = C.lungHi; ctx.lineWidth = 11;
+  ctx.beginPath(); ctx.moveTo(180,188); ctx.lineTo(180,228); ctx.stroke();
+  ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(180,226); ctx.quadraticCurveTo(166,236,160,248); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(180,226); ctx.quadraticCurveTo(196,236,202,248); ctx.stroke();
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.5;
+  for (let i=0;i<3;i++){ const y=196+i*10; ctx.beginPath(); ctx.moveTo(174,y); ctx.lineTo(186,y); ctx.stroke(); }
+
+  /* --- heart --- */
+  ctx.save();
+  ctx.translate(170, 252); ctx.scale(1+0.17*hb, 1+0.12*hb);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = 0.18+0.32*hb;
+  ctx.drawImage(GLOW.pink, -34,-34, 68,68);
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = C.heart; ctx.beginPath();
+  ctx.moveTo(0,16);
+  ctx.bezierCurveTo(-20,2, -20,-14, -9,-14);
+  ctx.bezierCurveTo(-3,-14, 0,-9, 0,-6);
+  ctx.bezierCurveTo( 0,-9,  3,-14,  9,-14);
+  ctx.bezierCurveTo(20,-14, 20,2, 0,16);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = C.heartHi; ctx.globalAlpha = 0.6;
+  ctx.beginPath(); ctx.ellipse(-6,-6,3.5,5,-0.4,0,6.2832); ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  /* --- stomach --- */
+  ctx.save();
+  ctx.translate(STOM_X, STOM_Y);
+  ctx.scale(STOM_S*(1+0.03*Math.sin(T*3.1)*churn), STOM_S*(1-0.025*Math.sin(T*3.1)*churn));
+  ctx.fillStyle = C.stom; ctx.fill(STOM);
+  if (stomachLevel > 0.01){
+    ctx.save(); ctx.clip(STOM);
+    ctx.fillStyle = C.chyme;
+    const top = 118 - 120*clamp01(stomachLevel);
+    ctx.beginPath(); ctx.moveTo(-60, top);
+    for (let x=-60; x<=70; x+=10) ctx.lineTo(x, top + Math.sin(x*0.12 + T*2.4)*2.5);
+    ctx.lineTo(70,124); ctx.lineTo(-60,124); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 0.5; ctx.fillStyle = "#FFE8C8";
+    for (let i=0;i<4;i++){
+      const ph = (T*0.5 + i*0.27) % 1;
+      ctx.beginPath(); ctx.ellipse(-26+i*18, 112-ph*(110-top), 3+i*0.9, 3+i*0.9, 0,0,6.2832); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+  ctx.strokeStyle = C.stomHi; ctx.lineWidth = 2; ctx.stroke(STOM);
+  ctx.restore();
+
+  /* --- intestine --- */
+  ctx.save();
+  if (organGlow.tummy > 0.01){
+    ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = organGlow.tummy*0.45;
+    ctx.drawImage(GLOW.green, TARGET.tummy.x-66, TARGET.tummy.y-56, 132, 112);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+  }
+  blit(ctx, bakedGut, 0, 0);
+  ctx.restore();
+
+  /* --- throat bulge, drawn under the skin so it reads as "inside" --- */
+  if (bulgeT >= 0){
+    const u = clamp01(bulgeT/0.6);
+    const bx = lerp(180,172,u), byy = lerp(150,282,u);
+    ctx.fillStyle = "#F0C49A";
+    ctx.beginPath(); ctx.ellipse(bx, byy, 9, 10, 0,0,6.2832); ctx.fill();
+  }
+
+  /* --- translucent skin over the torso: a transparency overlay, never a
+         dissection. No cut edges, no peeled flaps — that is what keeps it
+         friendly instead of gory. --- */
+  ctx.save();
+  ctx.translate(CX, 334); ctx.scale(1+0.025*b, 1+0.045*b); ctx.translate(-CX, -334);
+  ctx.fillStyle = C.skin; ctx.fill(torsoPath);
+  ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5; ctx.stroke(torsoPath);
+  ctx.restore();
+
+  /* --- head --- */
+  const sq = squashT >= 0 ? squashCurve(clamp01(squashT/0.45)) : { sx:1, sy:1 };
+  ctx.save();
+  ctx.translate(180, 164); ctx.scale(sq.sx, sq.sy); ctx.translate(-180, -164);
+  ctx.fillStyle = C.skinSolid;
+  rr(ctx, 163, 148, 34, 38, 12); ctx.fill();
+
+  if (organGlow.brain > 0.01 || organGlow.eyes > 0.01){
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = Math.max(organGlow.brain, organGlow.eyes)*0.45;
+    ctx.drawImage(GLOW.pink, 110, 36, 140, 140);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+  }
+  blit(ctx, bakedBrain, 0, 0);
+  if (organGlow.brain > 0.01){
+    ctx.globalCompositeOperation = "lighter";
+    for (let i=0;i<4;i++){
+      const ph = (T*1.1 + i*0.25) % 1;
+      ctx.globalAlpha = Math.sin(ph*Math.PI)*organGlow.brain*0.9;
+      ctx.drawImage(GLOW.gold, 152+i*20 - 7, 74 + Math.sin(ph*6.28+i)*6 - 7, 14, 14);
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+  }
+
+  ctx.fillStyle = C.skin;
+  ctx.beginPath(); ctx.ellipse(180, 100, 58, 64, 0, 0, 6.2832); ctx.fill();
+  ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5; ctx.stroke();
+
+  ctx.save();
+  ctx.beginPath(); ctx.ellipse(180, 100, 58, 64, 0, 0, 6.2832); ctx.clip();
+  ctx.fillStyle = C.hair;
+  ctx.beginPath();
+  ctx.moveTo(114, 104);
+  ctx.lineTo(114, 24); ctx.lineTo(246, 24); ctx.lineTo(246, 104);
+  ctx.bezierCurveTo(238, 78, 228, 64, 218, 59);
+  ctx.bezierCurveTo(208, 72, 195, 77, 180, 77);
+  ctx.bezierCurveTo(163, 77, 149, 71, 142, 59);
+  ctx.bezierCurveTo(130, 66, 120, 80, 114, 104);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = C.hairHi; ctx.globalAlpha = 0.45;
+  ctx.beginPath(); ctx.ellipse(150, 52, 17, 7, -0.45, 0, 6.2832); ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  const eo = eyeOpen();
+  const browLift = Math.max(organGlow.brain, organGlow.eyes)*4;
+  ctx.fillStyle = "#3D405B";
+  [[157,1],[203,-1]].forEach(function(E){
+    if (eo < 0.12){
+      ctx.strokeStyle = "#3D405B"; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(E[0], 120, 9, 0.15, Math.PI-0.15); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.ellipse(E[0], 120, 9.5, 11.5*eo, 0, 0, 6.2832); ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.ellipse(E[0]+3, 116, 3, 3.4*eo, 0, 0, 6.2832); ctx.fill();
+      ctx.fillStyle = "#3D405B";
+    }
+    ctx.strokeStyle = C.hair; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(E[0], 110-browLift, 11, Math.PI+0.3, -0.3); ctx.stroke();
+  });
+  ctx.strokeStyle = "#C9636F"; ctx.lineWidth = 3;
+  ctx.beginPath();
+  const smile = 6 + organGlow.build*3 + organGlow.eyes*3;
+  ctx.moveTo(168, 140); ctx.quadraticCurveTo(180, 140+smile, 192, 140); ctx.stroke();
+  ctx.fillStyle = "rgba(255,150,160,0.35)";
+  ctx.beginPath(); ctx.ellipse(146,132,9,6,0,0,6.2832); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(214,132,9,6,0,0,6.2832); ctx.fill();
+  ctx.restore();
+
+  ctx.restore();  // body transform
+
+  drawParticles(ctx, dt);
+
+  if (flying){
+    ctx.save();
+    const u = clamp01(flying.t/0.5);
+    const e = easeOutBack(u);
+    const x = lerp(flying.x0, 180, e), y = lerp(flying.y0, 146, e);
+    ctx.globalAlpha = u > 0.88 ? (1-u)/0.12 : 1;
+    ctx.font = "34px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.translate(x,y); ctx.rotate(Math.sin(u*7)*0.3*(1-u)); ctx.scale(1-u*0.25, 1-u*0.25);
+    ctx.fillText(flying.e, 0, 0);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+/* ============================ voice ============================
+   Web Speech, offline via the device's own voices. Gated by the shared mute
+   flag, exactly like abc-missing-letter and trace-and-spell. */
+let _voice = null;
+function pickVoice(){
+  if (!("speechSynthesis" in window)) return;
+  const vs = speechSynthesis.getVoices() || [];
+  _voice = vs.find(function(v){ return /en-IN|en_IN/i.test(v.lang); })
+        || vs.find(function(v){ return /en-GB/i.test(v.lang) && /female|kate|serena/i.test(v.name); })
+        || vs.find(function(v){ return /en-GB/i.test(v.lang); })
+        || vs.find(function(v){ return /^en/i.test(v.lang); }) || null;
+}
+if ("speechSynthesis" in window){
+  pickVoice();
+  speechSynthesis.onvoiceschanged = pickVoice;
+}
+function isMuted(){ try { return localStorage.getItem("miniGames.muted") === "1"; } catch(e){ return false; } }
+function speak(text, rate){
+  if (!("speechSynthesis" in window) || isMuted() || !text) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    if (_voice) u.voice = _voice;
+    u.lang = (_voice && _voice.lang) || "en-IN";
+    u.rate = rate || 0.92; u.pitch = 1.1;
+    speechSynthesis.speak(u);
+  } catch(e){}
+}
+function sfx(n){ try { if (window.Banter && Banter.sfx) Banter.sfx(n); } catch(e){} }
+
+/* ============================ emoji fallback ============================
+   🫘 (beans) only reached Android 12L/13 and 🫓 (flatbread) Android 11, so on
+   a budget phone they render as a tofu box. Swap those for an older glyph.
+   Every food also carries a text label, which fixes this for good. */
+function hasEmoji(ch){
+  try {
+    const c = document.createElement("canvas"); c.width = c.height = 24;
+    const x = c.getContext("2d"); x.textBaseline = "top"; x.font = "20px serif";
+    x.fillText(ch, 0, 0); const a = c.toDataURL();
+    x.clearRect(0,0,24,24); x.fillText("￿", 0, 0);
+    return a !== c.toDataURL();
+  } catch(e){ return true; }
+}
+function resolveEmoji(){
+  FOODS.forEach(function(f){ if (f.fb && !hasEmoji(f.e)) f.e = f.fb; });
+}
+
+/* ============================ game state ============================ */
+const SLOTS = 5;
+const meters = { build:0, bones:0, brain:0, eyes:0, tummy:0, water:0 };
+let plate = [];          // foods placed this meal
+let tray = [];           // foods currently offered
+let meal = 1;            // 1..3 == one day
+let teethAcid = 0;       // 1 = acid attack now, decays back to calm
+let teethWasAttacked = false;
+let busy = false;
+let phase = null, ph_t = 0, ph_food = null, ph_spawned = 0;
+let discovered = loadSet("miniGames.insideMe.found");
+
+function loadSet(k){ try { return new Set(JSON.parse(localStorage.getItem(k) || "[]")); } catch(e){ return new Set(); } }
+function saveSet(k, s){ try { localStorage.setItem(k, JSON.stringify(Array.from(s))); } catch(e){} }
+function ls(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : v; } catch(e){ return d; } }
+function lsSet(k, v){ try { localStorage.setItem(k, v); } catch(e){} }
+
+/* ============================ UI: meters ============================ */
+const metersEl = document.getElementById("meters");
+function buildMeters(){
+  metersEl.innerHTML = "";
+  ORGANS.forEach(function(o){
+    const d = document.createElement("div");
+    d.className = "meter";
+    d.innerHTML = '<span class="mi">'+o.i+'</span><span class="mn">'+o.n+'</span>'+
+                  '<span class="bar"><i id="bar_'+o.k+'" style="background:'+o.col+'"></i></span>';
+    metersEl.appendChild(d);
+  });
+  const t = document.createElement("div");
+  t.className = "meter";
+  t.innerHTML = '<span class="mi">🦷</span><span class="mn">Teeth</span>'+
+                '<span class="bar"><i id="bar_teeth" style="background:#BFE3FF"></i></span>';
+  metersEl.appendChild(t);
+}
+function syncMeters(){
+  ORGANS.forEach(function(o){
+    const el = document.getElementById("bar_"+o.k);
+    if (el) el.style.width = Math.min(100, meters[o.k]) + "%";
+  });
+  const te = document.getElementById("bar_teeth");
+  if (te) te.style.width = Math.round((1-teethAcid)*100) + "%";
+}
+
+/* ============================ UI: plate ============================ */
+const plateEl = document.getElementById("plate");
+function syncPlate(){
+  plateEl.innerHTML = "";
+  for (let i = 0; i < SLOTS; i++){
+    const d = document.createElement("div");
+    const fun = (i === SLOTS-1);
+    d.className = "slot" + (fun ? " fun" : "") + (plate[i] ? " full" : "");
+    d.textContent = plate[i] ? plate[i].e : (fun ? "⭐" : "");
+    plateEl.appendChild(d);
+  }
+}
+
+/* ============================ UI: tray ============================ */
+const trayEl = document.getElementById("tray");
+const everyday = FOODS.filter(function(f){ return f.g !== "sometimes"; });
+const sometimes = FOODS.filter(function(f){ return f.g === "sometimes"; });
+function shuffled(a){ const b = a.slice(); for (let i=b.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; const t=b[i]; b[i]=b[j]; b[j]=t; } return b; }
+
+function dealTray(){
+  const onPlate = new Set(plate.map(function(f){ return f.n; }));
+  const pickFrom = shuffled(everyday).filter(function(f){ return !onPlate.has(f.n); });
+  tray = pickFrom.slice(0, 7);
+  /* Sometimes-foods stay present and honest, but rare — children who played
+     ANY food-themed game ate more afterwards, sweets included, even when the
+     game showed fruit. So this is never the thing the game is about. */
+  if (Math.random() < 0.55){
+    const s = shuffled(sometimes).filter(function(f){ return !onPlate.has(f.n); })[0];
+    if (s) tray.push(s);
+  } else {
+    const extra = pickFrom[7];
+    if (extra) tray.push(extra);
+  }
+  tray = shuffled(tray);
+  renderTray();
+}
+function renderTray(){
+  trayEl.innerHTML = "";
+  tray.forEach(function(f){
+    const b = document.createElement("button");
+    b.className = "food"; b.type = "button";
+    b.innerHTML = '<span class="fe">'+f.e+'</span><span class="fn">'+f.n+'</span>';
+    b.addEventListener("pointerdown", function(ev){ ev.preventDefault(); onFood(f, b); });
+    trayEl.appendChild(b);
+  });
+}
+
+/* ============================ caption ============================ */
+const capEl = document.getElementById("caption");
+let capTimer = 0;
+function caption(html, secs){
+  capEl.innerHTML = html;
+  capEl.classList.add("show");
+  capTimer = secs || 3.2;
+}
+
+/* ============================ eating ============================ */
+let lastTap = 0;
+function onFood(f, btn){
+  const now = performance.now();
+  if (now - lastTap < 250) return;      // children double-fire; ignore the echo
+  lastTap = now;
+  if (busy || plate.length >= SLOTS) return;
+  busy = true;
+  const r = btn.getBoundingClientRect(), cr = cv.getBoundingClientRect();
+  flying = { e:f.e, t:0,
+             x0:(r.left + r.width/2 - cr.left - offX)/fit,
+             y0:(r.top  + r.height/2 - cr.top  - offY)/fit };
+  phase = "fly"; ph_t = 0; ph_food = f; ph_spawned = 0;
+  speak(f.n);
+  sfx("click");
+}
+
+function combosFor(f){
+  const out = [];
+  const names = plate.map(function(p){ return p.n; });
+  const has = function(fn){ return plate.some(fn); };
+  if (f.fe && has(function(p){ return p.vc; }))
+    out.push("🍋 <b>Together!</b> The vitamin C helped your body grab much more iron from the "+f.n.toLowerCase()+".");
+  if (f.vc && has(function(p){ return p.fe; }))
+    out.push("🍋 <b>Together!</b> That vitamin C just unlocked extra iron from the beans.");
+  if (f.fat && has(function(p){ return p.gives && p.gives.indexOf("eyes") >= 0; }))
+    out.push("🧈 <b>Together!</b> A little fat helps the orange vitamin A actually get in.");
+  if (f.gives && f.gives.indexOf("eyes") >= 0 && has(function(p){ return p.fat; }))
+    out.push("🧈 <b>Together!</b> The fat already on your plate helps this vitamin A get in.");
+  if (f.gives && f.gives.indexOf("bones") >= 0 && names.indexOf("Fish") >= 0)
+    out.push("☀️ <b>Together!</b> Vitamin D from the fish lets that calcium into your bones.");
+  return out;
+}
+
+function finishFood(f){
+  /* meters */
+  (f.gives || []).forEach(function(k){
+    if (k in meters){ meters[k] = Math.min(100, meters[k] + 22); pulseOrgan(k); }
+  });
+  /* sugar -> acid attack on the teeth, and the frequency lesson */
+  if (f.sug){
+    const again = teethAcid > 0.15;
+    teethAcid = Math.min(1, teethAcid + (f.teeth || 1) * 0.55);
+    teethWasAttacked = true;
+    if (again) setTimeout(function(){
+      caption("🦷 The acid never got a chance to stop. <b>How often</b> matters more than how much.", 4.4);
+      speak("The acid never got a chance to stop.");
+    }, 2600);
+  }
+  if (f.salt){
+    meters.water = Math.max(0, meters.water - 14);
+    setTimeout(function(){
+      caption("🧂 Salty! Your body is asking for <b>water</b> to balance it out.", 3.6);
+    }, 2600);
+  }
+  if (f.slow){ stomachLevel = Math.min(1, stomachLevel + 0.18); }
+  if (!discovered.has(f.n)){ discovered.add(f.n); newCount++; saveSet("miniGames.insideMe.found", discovered); }
+
+  plate.push(f);
+  syncPlate(); syncMeters();
+  busy = false;
+  if (plate.length >= SLOTS) setTimeout(mealReport, 1400);
+  else dealTray();
+}
+
+function updateEating(dt){
+  if (!phase) return;
+  ph_t += dt;
+  const f = ph_food;
+  if (phase === "fly"){
+    if (flying) flying.t += dt;
+    if (ph_t >= 0.5){ flying = null; phase = "chew"; ph_t = 0; squashT = 0; sfx("drop"); }
+  } else if (phase === "chew"){
+    squashT += dt;
+    if (ph_t >= 0.45){ squashT = -1; phase = "swallow"; ph_t = 0; bulgeT = 0; kick(2); }
+  } else if (phase === "swallow"){
+    bulgeT += dt;
+    if (ph_t >= 0.6){
+      bulgeT = -1; phase = "digest"; ph_t = 0;
+      stomachLevel = Math.min(1, stomachLevel + 0.26);
+      churn = 1; sfx("pot"); kick(2.5);
+      const extra = combosFor(f);
+      caption("<b>"+f.n+"</b> — "+f.line, 3.6);
+      speak(f.line);
+      if (extra.length) setTimeout(function(){ caption(extra[0], 4.2); speak(extra[0].replace(/<[^>]+>/g,"")); }, 3700);
+    }
+  } else if (phase === "digest"){
+    const gives = (f.gives && f.gives.length) ? f.gives : null;
+    if (gives && ph_t < 1.3){
+      ph_spawned += dt;
+      while (ph_spawned > 0.085){
+        ph_spawned -= 0.085;
+        spawnP(gives[(Math.random()*gives.length)|0]);
+      }
+    }
+    if (ph_t >= 2.5){
+      phase = null;
+      bpmTarget = 92;
+      finishFood(f);
+    }
+  }
+}
+
+/* ============================ screens ============================ */
+const overlay = document.getElementById("overlay");
+const panel = document.getElementById("panel");
+let newCount = 0;
+function show(html){ panel.innerHTML = html; overlay.classList.remove("hide"); }
+function hide(){ overlay.classList.add("hide"); }
+
+function mealGroups(){
+  const g = new Set(), col = new Set();
+  plate.forEach(function(f){
+    if (f.g !== "sometimes") g.add(f.g);
+    if (f.c) col.add(f.c);
+  });
+  return { g:g, col:col };
+}
+
+function mealReport(){
+  const r = mealGroups();
+  const core = ["veg","fruit","grain","protein","dairy"];
+  const covered = core.filter(function(k){ return r.g.has(k); }).length;
+  let stars = 0;
+  if (covered >= 3) stars++;
+  if (covered >= 5) stars++;
+  if (r.col.size >= 3 || newCount >= 1) stars++;
+  if (stars === 0) stars = 1;        // there is no losing here
+
+  const chips = core.map(function(k){
+    return '<span class="gchip'+(r.g.has(k)?" got":"")+'">'+GROUPS[k].i+" "+GROUPS[k].n+'</span>';
+  }).join("");
+
+  let msg;
+  if (covered >= 5) msg = "You found all five! 🌈";
+  else if (covered >= 3) msg = "Nice mix on that plate!";
+  else msg = "Your body is still curious about the other groups.";
+
+  const rainbow = Array.from(r.col).length;
+  show(
+    '<div class="big">'+plate.map(function(f){ return f.e; }).join("")+'</div>'+
+    '<div class="stars">'+"⭐".repeat(stars)+"</div>"+
+    "<h1>"+msg+"</h1>"+
+    '<div class="groupRow">'+chips+"</div>"+
+    "<p>"+rainbow+" different colour"+(rainbow===1?"":"s")+" on the plate"+
+      (newCount ? " · "+newCount+" new food"+(newCount===1?"":"s")+" tried 🎉" : "")+"</p>"+
+    '<button class="go" id="nextMeal">'+(meal >= 3 ? "See my day ▶" : "Next plate ▶")+"</button>"
+  );
+  sfx(stars >= 3 ? "win" : "great");
+  speak(msg);
+  document.getElementById("nextMeal").addEventListener("click", function(){
+    if (meal >= 3) dayReport(); else nextMeal();
+  });
+}
+
+function nextMeal(){
+  meal++; newCount = 0;
+  plate = [];
+  stomachLevel = Math.max(0, stomachLevel - 0.5);
+  syncPlate(); dealTray(); hide();
+}
+
+function dayReport(){
+  const total = ORGANS.reduce(function(a,o){ return a + Math.min(100, meters[o.k]); }, 0);
+  const avg = Math.round(total / ORGANS.length);
+  const kit = ORGANS.filter(function(o){ return meters[o.k] >= 40; });
+  const missing = ORGANS.filter(function(o){ return meters[o.k] < 40; });
+
+  /* day streak — it pauses, it never punishes */
+  const today = new Date().toDateString();
+  let streak = parseInt(ls("miniGames.insideMe.streak","0"), 10) || 0;
+  const last = ls("miniGames.insideMe.lastDay","");
+  if (last !== today){
+    const y = new Date(Date.now()-86400000).toDateString();
+    streak = (last === y) ? streak+1 : 1;
+    lsSet("miniGames.insideMe.streak", String(streak));
+    lsSet("miniGames.insideMe.lastDay", today);
+  }
+
+  let teethLine = "";
+  if (teethWasAttacked){
+    teethLine = "<p>🦷 Your mouth had a sweet moment today. Saliva washes the acid away in about an hour — so having something sweet <b>all at once</b> is easier on teeth than nibbling it all afternoon.</p>";
+  }
+
+  show(
+    '<div class="big">🌞</div>'+
+    "<h1>What a day!</h1>"+
+    "<p>Your body collected a toolkit of <b>"+avg+"%</b>.</p>"+
+    '<div class="groupRow">'+ORGANS.map(function(o){
+      return '<span class="gchip'+(meters[o.k]>=40?" got":"")+'">'+o.i+" "+o.n+"</span>"; }).join("")+"</div>"+
+    (missing.length ? "<p>Still waiting for a bit more: "+missing.map(function(o){ return o.i+" "+o.n; }).join(", ")+"</p>"
+                    : "<p>Every single part got what it needed. 🌈</p>")+
+    teethLine+
+    "<p>🔥 Day "+streak+" of your streak · "+discovered.size+" foods discovered</p>"+
+    '<button class="go" id="toIntent">Next ▶</button>'
+  );
+  sfx("win");
+  speak("What a day! Your body collected a toolkit.");
+  document.getElementById("toIntent").addEventListener("click", intentionPicker);
+}
+
+/* The single highest-leverage mechanic in the behaviour-change research:
+   a self-chosen, real-world intention, asked about on the next visit.
+   Every answer is warm; nothing is ever marked wrong. */
+function intentionPicker(){
+  const picks = shuffled(everyday).slice(0,3);
+  show(
+    '<div class="big">🌱</div>'+
+    "<h1>One real thing</h1>"+
+    "<p>Pick something to <b>taste for real</b> before you play again. Just a taste counts!</p>"+
+    '<div class="pick">'+picks.map(function(f,i){
+      return '<button class="pickBtn" data-i="'+i+'"><span class="pe">'+f.e+'</span><span class="pn">'+f.n+"</span></button>";
+    }).join("")+"</div>"+
+    '<button class="go" id="intentDone">That one! ▶</button>'+
+    '<button class="go alt" id="intentSkip">Maybe later</button>'
+  );
+  let sel = -1;
+  Array.prototype.forEach.call(panel.querySelectorAll(".pickBtn"), function(b){
+    b.addEventListener("click", function(){
+      Array.prototype.forEach.call(panel.querySelectorAll(".pickBtn"), function(x){ x.classList.remove("sel"); });
+      b.classList.add("sel"); sel = parseInt(b.getAttribute("data-i"),10);
+      speak(picks[sel].n);
+    });
+  });
+  document.getElementById("intentDone").addEventListener("click", function(){
+    if (sel < 0) return;
+    lsSet("miniGames.insideMe.intent", picks[sel].n);
+    lsSet("miniGames.insideMe.intentE", picks[sel].e);
+    show('<div class="big">'+picks[sel].e+"</div><h1>It's a plan!</h1>"+
+         "<p>Give <b>"+picks[sel].n+"</b> a taste. I'll ask you next time. 💛</p>"+
+         '<button class="go" id="again">Play again ▶</button>');
+    document.getElementById("again").addEventListener("click", resetDay);
+  });
+  document.getElementById("intentSkip").addEventListener("click", resetDay);
+}
+
+function resetDay(){
+  meal = 1; newCount = 0; plate = [];
+  ORGANS.forEach(function(o){ meters[o.k] = 0; });
+  teethAcid = 0; teethWasAttacked = false; stomachLevel = 0;
+  syncPlate(); syncMeters(); dealTray(); hide();
+}
+
+function askedAboutIntention(){
+  const n = ls("miniGames.insideMe.intent","");
+  if (!n) return false;
+  const e = ls("miniGames.insideMe.intentE","🌱");
+  show(
+    '<div class="big">'+e+"</div>"+
+    "<h1>Did you try "+n+"?</h1>"+
+    '<button class="go" id="yes">Yes I did! 🎉</button>'+
+    '<button class="go alt" id="notyet">Not yet</button>'+
+    '<button class="go alt" id="again2">I\'ll try again</button>'
+  );
+  speak("Did you try " + n + "?");
+  const done = function(msg){
+    lsSet("miniGames.insideMe.intent","");
+    show('<div class="big">💛</div><h1>'+msg+"</h1>"+
+         '<button class="go" id="play2">Let\'s play ▶</button>');
+    speak(msg);
+    document.getElementById("play2").addEventListener("click", startGame);
+  };
+  document.getElementById("yes").addEventListener("click", function(){ sfx("win"); done("You explored something new!"); });
+  document.getElementById("notyet").addEventListener("click", function(){ done("That's completely fine."); });
+  document.getElementById("again2").addEventListener("click", function(){ done("No rush at all."); });
+  return true;
+}
+
+function grownUps(){
+  show(
+    "<h1>For grown-ups</h1>"+
+    '<p class="fine">'+
+    "<b>No food is called good, bad or junk here.</b> Foods are <i>everyday</i> or "+
+    "<i>sometimes</i>, which describes how often we eat them — not whether a child "+
+    "is being good. Moralised food language is a known risk factor for disordered "+
+    "eating, and traffic-light systems in schools have been criticised by "+
+    "eating-disorder clinicians.<br><br>"+
+    "<b>Nothing is ever punished.</b> No points are lost, no timers, no losing, and "+
+    "the body never looks sad or sick. Restricting a food reliably makes children "+
+    "want it more, so every plate has a free ⭐ slot for anything at all.<br><br>"+
+    "<b>No calories, no weight, no body-size change</b> — in line with the American "+
+    "Academy of Pediatrics' guidance that lifestyle, not weight, is what to talk "+
+    "about with children.<br><br>"+
+    "<b>A nutrient's job is revealed after eating</b>, never used beforehand as a "+
+    "reason to eat. Children told a food would make them strong ate about half as "+
+    "much of it.<br><br>"+
+    "<b>No sugar-rush myth.</b> Twenty-three double-blind trials found sugar does "+
+    "not make children hyperactive. The game shows what the evidence actually "+
+    "shows: quick fuel, then a dip.<br><br>"+
+    "<b>No sponsor, no ads, no data.</b> Everything runs offline on this device."+
+    "</p>"+
+    '<button class="go" id="closeG">Back ▶</button>'
+  );
+  document.getElementById("closeG").addEventListener("click", function(){
+    if (started) hide(); else titleScreen();
+  });
+}
+
+let started = false;
+function titleScreen(){
+  show(
+    '<div class="big">🫀</div>'+
+    "<h1>Inside Me</h1>"+
+    "<p>Feed this body and watch what happens <b>inside</b> — where every bite goes, "+
+    "and what your body builds with it.</p>"+
+    '<button class="go" id="play">Play ▶</button>'
+  );
+  document.getElementById("play").addEventListener("click", function(){
+    if (!askedAboutIntention()) startGame();
+  });
+}
+
+function startGame(){
+  started = true;
+  hide();
+  try { if (window.Banter && Banter.startMusic) Banter.startMusic(); } catch(e){}
+  resetDay();
+  caption("Tap a food to feed me! 🍽️", 3.4);
+}
+
+/* ============================ main loop ============================ */
+function frame(ts){
+  const dt = Math.min(0.05, (ts - lastTs)/1000) || 0;
+  lastTs = ts;
+  T += dt;
+  fpsEma = fpsEma*0.92 + dt*1000*0.08;
+
+  if (cv.clientWidth !== lastCW || cv.clientHeight !== lastCH) resize();
+
+  updateBlink(dt);
+  updateEating(dt);
+
+  for (const k in organGlow) organGlow[k] = Math.max(0, organGlow[k] - dt*0.55);
+  churn = Math.max(0, churn - dt*0.35);
+  bpm = lerp(bpm, bpmTarget, Math.min(1, dt*2.2));
+  if (teethAcid > 0){ teethAcid = Math.max(0, teethAcid - dt/45); syncMeters(); }
+  if (capTimer > 0){ capTimer -= dt; if (capTimer <= 0) capEl.classList.remove("show"); }
+
+  draw(dt);
+  requestAnimationFrame(frame);
+}
+
+/* ============================ init ============================ */
+function init(){
+  resolveEmoji();
+  buildTorso(); buildGlows(); buildFlows();
+  buildMeters(); syncMeters(); syncPlate();
+  resize();
+  dealTray();
+  titleScreen();
+  document.getElementById("grownBtn").addEventListener("click", grownUps);
+  window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", function(){ setTimeout(resize, 120); });
+  document.addEventListener("visibilitychange", function(){ lastTs = performance.now(); });
+  requestAnimationFrame(function(ts){ lastTs = ts; requestAnimationFrame(frame); });
+}
+init();
+</script>
+</body>
+</html>

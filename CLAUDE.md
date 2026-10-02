@@ -68,14 +68,43 @@ Both skip `askNames` (big Play button), load `banter.js` for sfx/music/home/mute
 grounded in early-literacy research (3-letter window for working memory, tap-not-type, no
 penalties, effort rewards).
 
-**TTS exception — these two games DO use spoken voice** (user-requested, June 2026). Each has
+`inside-me` (Inside Me — feed an animated see-through body and watch the food travel
+down and the nutrients fly to the organs that use them; ages ~5–10). Canvas 2D, one
+design space of 360×620 letterboxed to any phone, with a cached skeleton / intestine
+coil / brain-fold bake, asymmetric breathing, a true lub-dub heart curve, and pre-baked
+radial glow sprites for the nutrient particles. **`ctx.filter='blur()'` is unusable on
+iOS Safari and `shadowBlur` is the big mobile FPS killer — do not reintroduce either;
+glows are radial-gradient sprites drawn with `'lighter'`, plus multi-pass strokes.**
+
+**Inside Me's language rules are deliberate and researched — please don't "simplify"
+them away.** Foods are **everyday** or **sometimes**, never good/bad/junk/unhealthy
+(moralised food language is a documented eating-disorder risk factor, and Go/Slow/Whoa
+traffic lights were publicly criticised after children named them as a trigger).
+Nothing subtracts points, nothing frowns, the body never looks sad or sick, and every
+plate has a free ⭐ slot for anything at all (restriction reliably increases wanting).
+No calories, no weight, no body-size change (AAP 2016). A nutrient's job is revealed
+*after* eating as a discovery, never used beforehand as a reason to eat — children told
+a food would make them strong ate about half as much of it. **There is no sugar-rush /
+hyperactivity animation**: 23 double-blind trials found sugar does not make children
+hyperactive, so the game shows what the evidence shows — quick fuel, then a dip. The
+tooth mechanic is the Stephan curve (acid below pH 5.5 within 2–5 min, saliva recovers
+it in 30–60 min), which teaches that **frequency** matters more than amount. Sometimes-
+foods are deliberately rare in the tray: children who played *any* food-themed game ate
+more afterwards, sweets included, even when the game showed fruit. There is a
+"For grown-ups" card behind the small `i` button explaining all of this. A pre-ship
+grep for the banned words is worth running; the only hits should be the code comment
+and that card.
+
+**TTS exception — these games DO use spoken voice** (user-requested; the two letter games
+June 2026, `inside-me` October 2026). Each has
 its own small `speak()` helper over the **Web Speech API** (`SpeechSynthesisUtterance`, offline
 via the device's own voices) — NOT in `banter.js`. ABC Train speaks the two flanking letter
 names as a hint and the answer on success; Trace & Spell speaks each letter's NAME as you trace
 it, the whole word ("sound it out") on completion, and re-reads on picture tap. Speech is gated
 by the shared mute flag (`localStorage miniGames.muted`). We speak letter NAMES + whole WORDS,
 not isolated phonemes — browser TTS can't make a clean `/b/` and a mangled "buh" hurts blending.
-This is the *only* place browser TTS lives; the board/Eagle Eye games stay TTS-free (see note below). (Eagle Eye additionally supports *recorded* Hinglish voice clips — not TTS — via `shared/commentary/`.)
+Inside Me speaks each food's name on tap and the discovery line when the nutrients land.
+These three are the *only* places browser TTS lives; the board/Eagle Eye games stay TTS-free (see note below). (Eagle Eye additionally supports *recorded* Hinglish voice clips — not TTS — via `shared/commentary/`.)
 
 **Quick solo play (collecting games):**
 `apple-collecting-game`, `collect-banana`, `broccoli-collection-game`.
@@ -150,5 +179,5 @@ vercel deploy --prod --yes          # → Vercel (manual)
 - Optional "Leave game?" confirm on the 🏠 button (currently navigates immediately).
 
 **Note:** the spoken voice was removed from the board/Eagle Eye games and `banter.js` on purpose
-— do not re-add TTS there unless asked. (Exception: the two kids' learning games `abc-missing-letter`
-and `trace-and-spell` use Web Speech TTS by explicit request — see the Learn & play section.)
+— do not re-add TTS there unless asked. (Exception: the kids' learning games `abc-missing-letter`,
+`trace-and-spell` and `inside-me` use Web Speech TTS by explicit request — see the Learn & play section.)

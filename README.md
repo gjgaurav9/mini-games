@@ -37,6 +37,7 @@ Gentle, **no-losing** learning games for little ones. Big touch targets, happy s
 |---|------|-------------|
 | 🔤 | **[ABC Train](abc-missing-letter/index.html)** | A letter fell off the train — see the letters on each side (A&nbsp;_&nbsp;C) and tap the one that belongs in between. Three big choices, a star for every win, and an `Aa` toggle for capital or small letters. Builds alphabet order, letter recognition and visual discrimination. |
 | ✏️ | **[Trace & Spell](trace-and-spell/index.html)** | See a picture, then trace each letter of its name with a finger to spell the word. Words are grouped into rhyming families (cat, hat, bat…). Lenient tracing with a ✓ Done helper — no failing. Builds letter formation, fine-motor skills, phonics and early spelling. |
+| 🫀 | **[Inside Me](inside-me/index.html)** | Feed a see-through cartoon body and watch what happens *inside* — the food is chewed, swallowed, churned in the stomach, and the nutrients fly off as glowing specks to the bones, muscles, eyes, gut and brain. Build a plate of five and find all five food groups. Foods are **everyday** or **sometimes** — never "good" or "bad" — nothing is ever punished, and there are no calories, no weight and no losing. Ends by asking you to pick one real food to taste before next time. |
 
 ## 🕹️ Quick solo play
 
