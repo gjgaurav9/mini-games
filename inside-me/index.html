@@ -114,12 +114,22 @@
   .pickBtn.sel { background: #D8F3E4; border-color: #7FD1A0; }
   .pickBtn .pe { font-size: clamp(26px, 7vw, 36px); }
   .pickBtn .pn { font-size: clamp(10px, 2.8vw, 12px); color: #6b5c4b; }
+  .rules { text-align: left; margin: 10px 0 4px; }
+  .rule { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 11px; }
+  .rule .rn { font-size: clamp(20px, 5.4vw, 26px); line-height: 1.2; flex: 0 0 auto; }
+  .rule .rt { font-size: clamp(12.5px, 3.3vw, 15px); color: #6b5c4b; line-height: 1.45; }
+  .rule .rt b { color: #3D405B; }
+  .noLose {
+    background: #F2FBF6; border-radius: 12px; padding: 9px 12px;
+    font-size: clamp(12.5px, 3.3vw, 15px) !important; color: #2f7d5a !important;
+  }
   .grown {
     position: absolute; top: 4px; right: 6px;
     z-index: 40; background: rgba(255,251,244,0.9); border: none;
     border-radius: 50%; width: 26px; height: 26px; font-size: 13px;
     cursor: pointer; color: #8a7a68; font-family: inherit;
   }
+  .grown.gi { right: 36px; }
   .panel .fine { font-size: clamp(11px, 2.9vw, 13px); color: #8a7a68; text-align: left; line-height: 1.55; }
   .panel .fine b { color: #3D405B; }
 </style>
@@ -130,7 +140,8 @@
   <div class="stage">
     <canvas id="c"></canvas>
     <div class="caption" id="caption"></div>
-    <button class="grown" id="grownBtn" aria-label="For grown-ups">i</button>
+    <button class="grown" id="rulesBtn" aria-label="How to play">?</button>
+    <button class="grown gi" id="grownBtn" aria-label="For grown-ups">i</button>
   </div>
   <div class="plate" id="plate"></div>
   <div class="tray" id="tray"></div>
@@ -290,10 +301,16 @@ const C = {
   brain:"#F6A8C0", brainFold:"#E2869F", brainHi:"#FFC9DB",
   bone:"#FFF8EC", boneSh:"#E6D7BE",
   muscle:"#E8907E",
+  stomSh:"#D98B3E",
+  liver:"#D99A86", liverSh:"#B87A66", liverHi:"#F0C4B2",
+  gall:"#A8D5A2", spleen:"#C98FB0", panc:"#F2CE8A",
+  kidney:"#D98B9E", kidneySh:"#B86F82", bladder:"#F2DFA0",
+  colon:"#E8A896", colonRim:"#C98477", colonHi:"#FFD0C2",
+  diaph:"#E8907E", gullet:"#F3C9A8",
 };
 
 /* ============================ design space ============================ */
-const W = 360, H = 620, CX = 180;
+const W = 360, H = 640, CX = 180;
 const cv = document.getElementById("c");
 let ctx = cv.getContext("2d");
 let fit = 1, offX = 0, offY = 0, DPR = 1;
@@ -311,6 +328,14 @@ function easeOutBack(t){ const s=1.70158; return 1+(s+1)*Math.pow(t-1,3)+s*Math.
 function rr(g,x,y,w,h,r){ if (g.roundRect) { g.beginPath(); g.roundRect(x,y,w,h,r); }
   else { g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
          g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); } }
+function bean(g,x,y,rx,ry,rot,notch){
+  g.save(); g.translate(x,y); g.rotate(rot||0);
+  g.beginPath();
+  g.moveTo(0,-ry);
+  g.bezierCurveTo( rx*1.2,-ry*0.7,  rx*1.2, ry*0.7, 0, ry);
+  g.bezierCurveTo(-rx*1.2, ry*0.7, -rx*(notch?0.35:1.2),-ry*0.7, 0,-ry);
+  g.closePath(); g.restore();
+}
 
 /* Breathing: inhale fast (40% of cycle), exhale slow (60%). A plain sine
    reads as "floating"; this reads as alive. Range exactly 0..1. */
@@ -353,13 +378,15 @@ function eyeOpen(){
 
 /* ============================ body outline ============================ */
 /* One half written as offsets from the centre line, then mirrored, so the
-   figure is exactly symmetric and closes on itself. ~5 head-heights tall. */
+   figure is exactly symmetric. A roomier torso than a stick figure, because
+   there are a lot of organs to fit in here and still leave gaps between them. */
+const TOP_Y = 168;
 const TORSO = [
-  [ 34,186,   64,190,   78,212],
-  [ 92,232,   94,258,   88,286],
-  [ 82,312,   70,318,   66,334],
-  [ 62,352,   74,368,   80,392],
-  [ 84,410,   76,426,   58,432],
+  [ 36,172,   68,176,   84,198],
+  [ 98,220,  100,248,   92,272],
+  [ 86,300,   78,314,   76,334],
+  [ 74,356,   84,376,   88,396],
+  [ 92,418,   82,440,   62,452],
 ];
 function traceMirrored(p, segs, topY){
   p.moveTo(CX, topY);
@@ -374,9 +401,11 @@ function traceMirrored(p, segs, topY){
   p.closePath();
 }
 let torsoPath = null;
-function buildTorso(){ torsoPath = new Path2D(); traceMirrored(torsoPath, TORSO, 182); }
+function buildTorso(){ torsoPath = new Path2D(); traceMirrored(torsoPath, TORSO, TOP_Y); }
 
-/* ============================ organ paths ============================ */
+const FOOT_Y = 544;        // sway pivot + where the figure ends
+
+/* ============================ organ geometry ============================ */
 function stomachPath(){
   const p = new Path2D();
   p.moveTo(0,0);
@@ -388,7 +417,7 @@ function stomachPath(){
   p.closePath(); return p;
 }
 const STOM = stomachPath();
-const STOM_X = 170, STOM_Y = 276, STOM_S = 0.72;
+const STOM_X = 200, STOM_Y = 294, STOM_S = 0.56;
 
 function coilPoints(x, y, w, h, rows, seed){
   const rnd = mulberry32(seed), pts = [], dy = h/(rows-1);
@@ -397,10 +426,10 @@ function coilPoints(x, y, w, h, rows, seed){
     const x0 = left ? x : x+w, x1 = left ? x+w : x;
     for (let k = 0; k <= 4; k++){
       const u = k/4;
-      pts.push({ x: x0 + (x1-x0)*u + (rnd()-0.5)*7,
-                 y: y + i*dy + Math.sin(u*Math.PI)*dy*0.22 + (rnd()-0.5)*4 });
+      pts.push({ x: x0 + (x1-x0)*u + (rnd()-0.5)*6,
+                 y: y + i*dy + Math.sin(u*Math.PI)*dy*0.22 + (rnd()-0.5)*3 });
     }
-    if (i < rows-1) pts.push({ x: x1 + (left ? 14 : -14), y: y + i*dy + dy*0.5 });
+    if (i < rows-1) pts.push({ x: x1 + (left ? 12 : -12), y: y + i*dy + dy*0.5 });
   }
   return pts;
 }
@@ -414,8 +443,23 @@ function catmullPath(pts, tension){
   }
   return p;
 }
-const GUT_PTS  = coilPoints(132, 368, 96, 54, 4, 1337);
+const GUT_PTS  = coilPoints(144, 386, 72, 30, 3, 1337);
 const GUT_PATH = catmullPath(GUT_PTS, 1);
+
+/* the large intestine frames the small one — ascending, transverse, descending */
+function colonPath(){
+  const p = new Path2D();
+  p.moveTo(126, 430);
+  p.lineTo(126, 388);
+  p.quadraticCurveTo(126, 372, 144, 372);
+  p.lineTo(216, 372);
+  p.quadraticCurveTo(234, 372, 234, 388);
+  p.lineTo(234, 424);
+  p.quadraticCurveTo(234, 438, 214, 438);
+  p.lineTo(196, 438);
+  return p;
+}
+const COLON = colonPath();
 
 function drawTube(g, path, outer, inner, cOuter, cInner, cHi){
   g.lineCap="round"; g.lineJoin="round";
@@ -426,8 +470,12 @@ function drawTube(g, path, outer, inner, cOuter, cInner, cHi){
   g.restore(); g.globalAlpha=1;
 }
 
+/* The swallow route: mouth -> food pipe -> stomach. Drawn, and the bolus
+   visibly travels it, because "where does it actually go" is the whole point. */
+const GULLET = [{x:181,y:140},{x:186,y:186},{x:193,y:232},{x:198,y:268},{x:200,y:292}];
+
 /* ============================ baked static art ============================ */
-let bakedSkel = null, bakedGut = null, bakedBrain = null;
+let bakedSkel=null, bakedVess=null, bakedVisc=null, bakedBrain=null, bakedLimbBone=null;
 function bake(w, h, drawFn){
   const c = document.createElement("canvas");
   const s = Math.max(0.5, fit) * DPR;
@@ -441,17 +489,18 @@ function bake(w, h, drawFn){
 function blit(g, b, x, y){ if (b) g.drawImage(b.c, 0,0,b.c.width,b.c.height, x,y, b.w,b.h); }
 
 function bakeAll(){
-  /* ribcage + spine. 8 pairs reads skeletal/spooky; 6 chunky pairs reads cartoon.
-     Bone is warm ivory, never grey — grey bone reads Halloween. */
-  bakedSkel = bake(W, 460, function(g){
-    const pairs = 6, topY = 206;
+  /* ---- skeleton: ribs, sternum, clavicles, spine, pelvis ----
+     Warm ivory, never grey — grey bone reads Halloween skeleton. Chunky and
+     few rather than many and thin, which reads cartoon instead of skeletal. */
+  bakedSkel = bake(W, 470, function(g){
+    const pairs = 7, topY = 198;
     for (let pass = 0; pass < 2; pass++){
       g.strokeStyle = pass ? C.bone : C.boneSh;
-      g.lineWidth = pass ? 9 : 12;
+      g.lineWidth = pass ? 8 : 11;
       for (let i = 0; i < pairs; i++){
-        const y = topY + i*21;
-        const w = 42 + 34*Math.sin(Math.PI*(i+1.1)/(pairs+1.6));
-        const dr = 20 + i*2.0;
+        const y = topY + i*16;
+        const w = 46 + 36*Math.sin(Math.PI*(i+1.1)/(pairs+1.6));
+        const dr = 17 + i*1.8;
         for (const s of [1,-1]){
           g.beginPath(); g.moveTo(CX + s*7, y);
           g.quadraticCurveTo(CX + s*w*1.06, y+3, CX + s*w*0.54, y+dr);
@@ -459,34 +508,160 @@ function bakeAll(){
         }
       }
     }
-    rr(g, CX-9, 212, 18, 68, 9); g.fillStyle = C.bone; g.fill();
+    rr(g, CX-9, 202, 18, 64, 9); g.fillStyle = C.bone; g.fill();
     g.strokeStyle = C.boneSh; g.lineWidth = 1.5; g.stroke();
-    const n = 11, y0 = 196, y1 = 428;
+    g.strokeStyle = C.bone; g.lineWidth = 7;                       // clavicles
+    for (const s of [1,-1]){
+      g.beginPath(); g.moveTo(CX + s*8, 196);
+      g.quadraticCurveTo(CX + s*44, 190, CX + s*74, 202); g.stroke();
+    }
+    const n = 13, y0 = 180, y1 = 446;                              // spine
     for (let i = 0; i < n; i++){
-      const u=i/(n-1), y=y0+(y1-y0)*u, w=15-4*u, h=(y1-y0)/n-3;
+      const u=i/(n-1), y=y0+(y1-y0)*u, w=16-5*u, h=(y1-y0)/n-3;
       rr(g, CX-w/2, y, w, h, 4);
       g.fillStyle = C.bone; g.fill();
-      g.strokeStyle = C.boneSh; g.lineWidth = 1.5; g.stroke();
+      g.strokeStyle = C.boneSh; g.lineWidth = 1.4; g.stroke();
+    }
+    g.strokeStyle = C.bone; g.lineWidth = 13;                      // pelvis bowl
+    g.beginPath();
+    g.moveTo(130, 406);
+    g.bezierCurveTo(128, 432, 152, 448, 180, 448);
+    g.bezierCurveTo(208, 448, 232, 432, 230, 406);
+    g.stroke();
+    for (const s of [1,-1]){                                       // iliac wings
+      g.beginPath(); g.moveTo(CX + s*50, 406);
+      g.quadraticCurveTo(CX + s*60, 396, CX + s*54, 388); g.stroke();
     }
   });
 
-  bakedGut = bake(W, 460, function(g){
-    drawTube(g, GUT_PATH, 20, 15, C.gutRim, C.gut, C.gutHi);
+  /* ---- big vessels, drawn behind the organs so they peek between them ---- */
+  bakedVess = bake(W, 470, function(g){
+    g.lineCap = "round";
+    g.strokeStyle = "#FF9FAE"; g.lineWidth = 6;                    // aorta
+    g.beginPath(); g.moveTo(182, 262);
+    g.bezierCurveTo(196, 268, 190, 320, 187, 420);
+    g.stroke();
+    g.beginPath(); g.moveTo(187, 420);                             // iliac branches
+    g.quadraticCurveTo(204, 436, 210, 450); g.stroke();
+    g.beginPath(); g.moveTo(187, 420);
+    g.quadraticCurveTo(168, 436, 160, 450); g.stroke();
+    g.strokeStyle = "#9FB8FF"; g.lineWidth = 6;                    // vena cava
+    g.beginPath(); g.moveTo(170, 262);
+    g.bezierCurveTo(160, 300, 170, 360, 173, 420); g.stroke();
+    g.strokeStyle = "#FFB8C4"; g.lineWidth = 3;                    // smaller piping
+    for (const s of [1,-1]){
+      g.beginPath(); g.moveTo(CX + s*6, 286);
+      g.quadraticCurveTo(CX + s*46, 296, CX + s*62, 330); g.stroke();
+      g.beginPath(); g.moveTo(CX + s*6, 212);
+      g.quadraticCurveTo(CX + s*40, 206, CX + s*64, 222); g.stroke();
+    }
   });
 
-  /* brain folds: clip to the bean, then scribble inside. The periodic bias on
-     the random walk is what gives real gyral waviness instead of spaghetti. */
-  bakedBrain = bake(W, 180, function(g){
-    const bean = new Path2D();
-    bean.ellipse(CX, 78, 43, 23, 0, 0, Math.PI*2);
-    g.fillStyle = C.brain; g.fill(bean);
+  /* ---- the soft organs ----
+     Flat fill + one rim shade + one soft highlight. No wet/specular gradients:
+     shine reads as slimy. Gaps are left between organs on purpose — packed,
+     touching viscera is the visual signature of "guts". */
+  bakedVisc = bake(W, 470, function(g){
+    function organ(path, fill, rim, hi){
+      g.fillStyle = fill; g.fill(path);
+      g.strokeStyle = rim; g.lineWidth = 2; g.stroke(path);
+      if (hi){ g.save(); g.globalAlpha = 0.45; g.fillStyle = hi; g.fill(hi.p || path); g.restore(); }
+    }
+    /* liver — the big wedge, viewer's left */
+    const liv = new Path2D();
+    liv.moveTo(100, 312);
+    liv.bezierCurveTo(104, 298, 140, 294, 168, 302);
+    liv.bezierCurveTo(176, 305, 176, 318, 168, 330);
+    liv.bezierCurveTo(154, 348, 120, 354, 106, 342);
+    liv.bezierCurveTo( 99, 335,  98, 322, 100, 312);
+    liv.closePath();
+    g.fillStyle = C.liver; g.fill(liv);
+    g.strokeStyle = C.liverSh; g.lineWidth = 2; g.stroke(liv);
+    g.strokeStyle = C.liverSh; g.lineWidth = 2.5;                  // lobe crease
+    g.beginPath(); g.moveTo(134, 297); g.lineTo(130, 350); g.stroke();
+    g.globalAlpha = 0.4; g.fillStyle = C.liverHi;
+    g.beginPath(); g.ellipse(120, 310, 14, 6, -0.2, 0, 6.2832); g.fill();
+    g.globalAlpha = 1;
+
+    /* gall bladder, tucked under the liver */
+    g.fillStyle = C.gall;
+    bean(g, 152, 350, 6, 10, 0.25); g.fill();
+    g.strokeStyle = "#6FA86B"; g.lineWidth = 1.5; g.stroke();
+
+    /* spleen, viewer's right */
+    g.fillStyle = C.spleen;
+    bean(g, 248, 314, 10, 16, -0.3); g.fill();
+    g.strokeStyle = "#8E5C7A"; g.lineWidth = 1.5; g.stroke();
+
+    /* pancreas — a tapered comma behind the stomach */
+    g.strokeStyle = C.panc; g.lineCap = "round";
+    g.lineWidth = 11; g.beginPath(); g.moveTo(186, 364); g.lineTo(206, 360); g.stroke();
+    g.lineWidth = 6;  g.beginPath(); g.moveTo(206, 360); g.lineTo(228, 352); g.stroke();
+
+    /* kidneys + ureters + bladder */
+    for (const s of [1,-1]){
+      g.fillStyle = C.kidney;
+      bean(g, CX + s*64, 364, 12, 19, s>0 ? 0.12 : -0.12, true); g.fill();
+      g.strokeStyle = C.kidneySh; g.lineWidth = 1.8; g.stroke();
+      g.strokeStyle = C.kidneySh; g.lineWidth = 2.5;
+      g.beginPath(); g.moveTo(CX + s*58, 380);
+      g.quadraticCurveTo(CX + s*40, 412, CX + s*12, 434); g.stroke();
+    }
+    g.fillStyle = C.bladder;
+    bean(g, 180, 440, 15, 12, 0); g.fill();
+    g.strokeStyle = "#C9A24A"; g.lineWidth = 1.8; g.stroke();
+
+    /* large intestine frames the small one */
+    drawTube(g, COLON, 24, 19, C.colonRim, C.colon, C.colonHi);
+    drawTube(g, GUT_PATH, 17, 13, C.gutRim, C.gut, C.gutHi);
+  });
+
+  /* ---- limb bones + a few muscle fibres, shown faintly through the skin ---- */
+  bakedLimbBone = bake(W, 570, function(g){
+    g.globalAlpha = 0.5; g.lineCap = "round";
+    for (const s of [1,-1]){
+      g.strokeStyle = C.bone; g.lineWidth = 9;                     // humerus
+      g.beginPath(); g.moveTo(CX + s*80, 206);
+      g.quadraticCurveTo(CX + s*112, 250, CX + s*118, 292); g.stroke();
+      g.lineWidth = 5;                                             // radius + ulna
+      for (const o of [-3.5, 3.5]){
+        g.beginPath(); g.moveTo(CX + s*118 + o, 296);
+        g.quadraticCurveTo(CX + s*118 + o, 340, CX + s*113 + o, 384); g.stroke();
+      }
+      g.lineWidth = 12;                                            // femur
+      g.beginPath(); g.moveTo(CX + s*34, 446);
+      g.quadraticCurveTo(CX + s*52, 472, CX + s*54, 496); g.stroke();
+      g.lineWidth = 7;                                             // tibia + fibula
+      for (const o of [-3, 3]){
+        g.beginPath(); g.moveTo(CX + s*54 + o, 500);
+        g.quadraticCurveTo(CX + s*52 + o, 520, CX + s*47 + o, 538); g.stroke();
+      }
+    }
+    g.globalAlpha = 0.28; g.strokeStyle = C.muscle; g.lineWidth = 3;
+    for (const s of [1,-1]){
+      for (let i = 0; i < 3; i++){
+        g.beginPath(); g.moveTo(CX + s*(86+i*5), 214 + i*4);
+        g.quadraticCurveTo(CX + s*(104+i*5), 240, CX + s*(110+i*4), 268); g.stroke();
+        g.beginPath(); g.moveTo(CX + s*(40+i*5), 452 + i*3);
+        g.quadraticCurveTo(CX + s*(54+i*4), 470, CX + s*(56+i*3), 492); g.stroke();
+      }
+    }
+    g.globalAlpha = 1;
+  });
+
+  /* ---- brain: clip to the bean, then scribble. The periodic bias on the
+         random walk is what gives gyral waviness instead of spaghetti. ---- */
+  bakedBrain = bake(W, 170, function(g){
+    const b = new Path2D();
+    b.ellipse(CX, 72, 38, 20, 0, 0, Math.PI*2);
+    g.fillStyle = C.brain; g.fill(b);
     const rnd = mulberry32(99);
-    g.save(); g.clip(bean);
-    for (let b = 0; b < 12; b++){
-      let px = CX-43 + rnd()*86, py = 56 + rnd()*44, a = rnd()*Math.PI*2;
+    g.save(); g.clip(b);
+    for (let k = 0; k < 11; k++){
+      let px = CX-38 + rnd()*76, py = 54 + rnd()*36, a = rnd()*Math.PI*2;
       g.beginPath(); g.moveTo(px, py);
       for (let i = 0; i < 9; i++){
-        a += (rnd()-0.5)*1.0 + Math.sin(i*0.9 + b)*0.40;
+        a += (rnd()-0.5)*1.0 + Math.sin(i*0.9 + k)*0.40;
         const nx = px + Math.cos(a)*6, ny = py + Math.sin(a)*6;
         g.quadraticCurveTo(px, py, (px+nx)/2, (py+ny)/2);
         px = nx; py = ny;
@@ -496,6 +671,8 @@ function bakeAll(){
       g.save(); g.translate(0,-1.4); g.stroke(); g.restore();
     }
     g.restore();
+    g.fillStyle = C.brainFold; g.globalAlpha = 0.8;                // cerebellum
+    bean(g, 180, 94, 15, 7, 0); g.fill(); g.globalAlpha = 1;
   });
 }
 
@@ -549,18 +726,20 @@ function makeFlow(pts, samples){
   }};
 }
 const TARGET = {
-  build:{x:258,y:300}, bones:{x:180,y:250}, brain:{x:180,y:78},
-  eyes:{x:180,y:120},  tummy:{x:180,y:394}, water:{x:180,y:330},
+  build:{x:300,y:296}, bones:{x:180,y:236}, brain:{x:180,y:72},
+  eyes:{x:180,y:116},  tummy:{x:180,y:400}, water:{x:180,y:340},
 };
 const FLOW = {};
+let GULLET_FLOW = null;
 function buildFlows(){
-  const ex = {x:172,y:350};
-  FLOW.build = makeFlow([ex,{x:205,y:338},{x:240,y:316},TARGET.build]);
-  FLOW.bones = makeFlow([ex,{x:188,y:312},{x:183,y:278},TARGET.bones]);
-  FLOW.brain = makeFlow([ex,{x:176,y:282},{x:180,y:180},TARGET.brain]);
-  FLOW.eyes  = makeFlow([ex,{x:178,y:286},{x:181,y:192},TARGET.eyes]);
-  FLOW.tummy = makeFlow([ex,{x:168,y:366},{x:176,y:384},TARGET.tummy]);
-  FLOW.water = makeFlow([ex,{x:175,y:342},TARGET.water]);
+  const ex = {x:184,y:352};
+  FLOW.build = makeFlow([ex,{x:216,y:338},{x:266,y:312},TARGET.build]);
+  FLOW.bones = makeFlow([ex,{x:190,y:310},{x:184,y:268},TARGET.bones]);
+  FLOW.brain = makeFlow([ex,{x:181,y:280},{x:180,y:170},TARGET.brain]);
+  FLOW.eyes  = makeFlow([ex,{x:182,y:284},{x:181,y:184},TARGET.eyes]);
+  FLOW.tummy = makeFlow([ex,{x:176,y:372},{x:178,y:390},TARGET.tummy]);
+  FLOW.water = makeFlow([ex,{x:182,y:346},TARGET.water]);
+  GULLET_FLOW = makeFlow(GULLET, 90);
 }
 
 /* ============================ particles ============================ */
@@ -593,13 +772,51 @@ function drawParticles(g, dt){
   g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
 }
 
+/* ============================ tap an organ to meet it ============================
+   Circle hit-tests, front-most first. Plain anatomy, no myths, no scare. */
+const SPOTS = [
+  { k:"heart",  x:177, y:256, r:22, n:"Heart",
+    s:"Heart — it pumps blood to every corner of you, all day and all night." },
+  { k:"stomach",x:203, y:324, r:28, n:"Stomach",
+    s:"Stomach — it churns your food into a warm soup." },
+  { k:"lungL",  x:145, y:242, r:26, n:"Lungs",
+    s:"Lungs — they take in air so your blood can carry oxygen around." },
+  { k:"lungR",  x:217, y:242, r:26, n:"Lungs",
+    s:"Lungs — they take in air so your blood can carry oxygen around." },
+  { k:"liver",  x:133, y:322, r:32, n:"Liver",
+    s:"Liver — your body's own cleaning department. It stores spare fuel too." },
+  { k:"gall",   x:152, y:350, r:10, n:"Gall bladder",
+    s:"Gall bladder — it keeps bile, which breaks fat into tiny drops." },
+  { k:"spleen", x:248, y:314, r:13, n:"Spleen",
+    s:"Spleen — it helps clean your blood and fight off germs." },
+  { k:"panc",   x:202, y:360, r:16, n:"Pancreas",
+    s:"Pancreas — it sends juices that break your food apart." },
+  { k:"kidL",   x:116, y:364, r:16, n:"Kidneys",
+    s:"Kidneys — they filter your blood and make wee." },
+  { k:"kidR",   x:244, y:364, r:16, n:"Kidneys",
+    s:"Kidneys — they filter your blood and make wee." },
+  { k:"bladder",x:180, y:440, r:16, n:"Bladder",
+    s:"Bladder — it holds the wee until you are ready to go." },
+  { k:"small",  x:180, y:400, r:32, n:"Small intestine",
+    s:"Small intestine — this is where most of your food is really taken in." },
+  { k:"large",  x:180, y:402, r:58, n:"Large intestine",
+    s:"Large intestine — it takes the water back and feeds your gut bugs." },
+  { k:"ribs",   x:180, y:228, r:72, n:"Ribs and spine",
+    s:"Ribs and spine — bones. They make a cage to guard your heart and lungs." },
+  { k:"brain",  x:180, y:72,  r:42, n:"Brain",
+    s:"Brain — your control room. It runs on steady fuel and plenty of water." },
+  { k:"mouth",  x:180, y:136, r:24, n:"Teeth",
+    s:"Teeth — they chop and grind. Digestion starts right here in your mouth." },
+];
+let spotRing = null, spotRingT = 0;
+
 /* ============================ live body state ============================ */
 const organGlow = { build:0, bones:0, brain:0, eyes:0, tummy:0, water:0 };
 function pulseOrgan(k){ if (k in organGlow) organGlow[k] = Math.min(1.4, organGlow[k]+0.5); }
 let bpm = 92, bpmTarget = 92;
 let stomachLevel = 0, churn = 0;
 let squashT = -1;            // head squash on chewing
-let bulgeT = -1;             // throat bulge on swallowing
+let bulgeT = -1;             // bolus travelling the food pipe
 let flying = null;           // food emoji in transit
 const shake = { t:0, dur:0.35, amp:0 };
 function kick(amp){ if (reduced) return; shake.amp = Math.min(amp, 6); shake.dur = 0.35; shake.t = 0.35; }
@@ -638,7 +855,7 @@ function draw(dt){
   const by = bob(T);
 
   ctx.save();
-  ctx.translate(CX, 534); ctx.rotate(sway(T)); ctx.translate(-CX, -534 + by);
+  ctx.translate(CX, FOOT_Y); ctx.rotate(sway(T)); ctx.translate(-CX, -FOOT_Y + by);
 
   /* --- aura: rim glow when the body is well watered --- */
   const aura = organGlow.water*0.5 + (meters.water/100)*0.35;
@@ -653,7 +870,7 @@ function draw(dt){
     ctx.globalCompositeOperation = "source-over";
   }
 
-  /* --- limbs (behind the torso) --- */
+  /* --- limbs, then their bones showing faintly through --- */
   function limb(ax,ay,bx,by2,cx2,cy,w0,w1){
     ctx.strokeStyle = C.skinSolid;
     ctx.beginPath(); ctx.moveTo(ax,ay); ctx.quadraticCurveTo(bx,by2,cx2,cy);
@@ -662,62 +879,98 @@ function draw(dt){
     ctx.lineWidth = w1; ctx.stroke();
   }
   const flex = organGlow.build;
-  limb(262,214, 292,300, 288-flex*6,392, 30+flex*5, 24+flex*4);
-  limb(98,214,  68,300,  72+flex*6,392, 30+flex*5, 24+flex*4);
-  limb(214,424, 230,486, 222,530, 40, 30);
-  limb(146,424, 130,486, 138,530, 40, 30);
+  limb(264,202, 300,250, 298,392, 32+flex*5, 25+flex*4);
+  limb( 96,202,  60,250,  62,392, 32+flex*5, 25+flex*4);
+  limb(216,446, 236,494, 228,540, 42, 31);
+  limb(144,446, 124,494, 132,540, 42, 31);
+  blit(ctx, bakedLimbBone, 0, 0);
   ctx.fillStyle = "#F7C9A3"; ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
-  [[288,400],[72,400]].forEach(function(h){ ctx.beginPath(); ctx.ellipse(h[0],h[1],13,13,0,0,6.2832); ctx.fill(); ctx.stroke(); });
-  [[224,534],[136,534]].forEach(function(f){ ctx.beginPath(); ctx.ellipse(f[0],f[1],20,11,0,0,6.2832); ctx.fill(); ctx.stroke(); });
+  [[298,400],[62,400]].forEach(function(h){ ctx.beginPath(); ctx.ellipse(h[0],h[1],13,13,0,0,6.2832); ctx.fill(); ctx.stroke(); });
+  [[230,546],[130,546]].forEach(function(f){ ctx.beginPath(); ctx.ellipse(f[0],f[1],20,11,0,0,6.2832); ctx.fill(); ctx.stroke(); });
 
-  /* --- skeleton --- */
+  /* --- skeleton, vessels, soft organs (all baked) --- */
   ctx.save();
   if (organGlow.bones > 0.01){
     ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = organGlow.bones*0.5;
-    ctx.drawImage(GLOW.cream, TARGET.bones.x-70, TARGET.bones.y-70, 140, 140);
+    ctx.drawImage(GLOW.cream, TARGET.bones.x-74, TARGET.bones.y-74, 148, 148);
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
   }
   blit(ctx, bakedSkel, 0, 0);
   ctx.restore();
+  ctx.globalAlpha = 0.85; blit(ctx, bakedVess, 0, 0); ctx.globalAlpha = 1;
+  ctx.save();
+  if (organGlow.tummy > 0.01){
+    ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = organGlow.tummy*0.45;
+    ctx.drawImage(GLOW.green, TARGET.tummy.x-70, TARGET.tummy.y-60, 140, 120);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+  }
+  blit(ctx, bakedVisc, 0, 0);
+  ctx.restore();
 
-  /* --- lungs (move far more than the skin does) --- */
+  /* --- diaphragm: the breathing muscle, flattens as the chest fills --- */
+  ctx.strokeStyle = C.diaph; ctx.lineWidth = 5; ctx.globalAlpha = 0.75;
+  ctx.beginPath(); ctx.moveTo(108, 298);
+  ctx.quadraticCurveTo(180, 274 + 9*b, 252, 298);
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  /* --- food pipe, and the bolus actually travelling down it --- */
+  ctx.strokeStyle = C.gullet; ctx.lineWidth = 12; ctx.globalAlpha = 0.9;
+  ctx.beginPath(); ctx.moveTo(GULLET[0].x, GULLET[0].y);
+  for (let i=1;i<GULLET.length;i++) ctx.lineTo(GULLET[i].x, GULLET[i].y);
+  ctx.stroke(); ctx.globalAlpha = 1;
+  if (bulgeT >= 0 && GULLET_FLOW){
+    const u = clamp01(bulgeT/0.7);
+    const pt = GULLET_FLOW.at(u);
+    ctx.fillStyle = C.chyme;
+    ctx.beginPath(); ctx.ellipse(pt.x, pt.y, 8, 9.5, 0,0,6.2832); ctx.fill();
+  }
+
+  /* --- lungs: they move far more than the skin does --- */
   const lsx = 1+0.05*b, lsy = 1+0.11*b;
-  ctx.fillStyle = C.lung;
-  [[148,1],[208,-1]].forEach(function(L){
-    ctx.save(); ctx.translate(L[0],236); ctx.scale(lsx,lsy);
+  [[145,1],[217,-1]].forEach(function(L){
+    ctx.save(); ctx.translate(L[0],242); ctx.scale(lsx,lsy);
+    ctx.fillStyle = C.lung;
     ctx.beginPath();
-    ctx.moveTo(0,-30);
-    ctx.bezierCurveTo(20*L[1],-26, 26*L[1],-2, 22*L[1],24);
-    ctx.bezierCurveTo(19*L[1],40, 4*L[1],44, -4*L[1],36);
-    ctx.bezierCurveTo(-12*L[1],28, -14*L[1],4, -10*L[1],-14);
-    ctx.bezierCurveTo(-8*L[1],-24, -5*L[1],-29, 0,-30);
+    ctx.moveTo(0,-46);
+    ctx.bezierCurveTo(24*L[1],-40, 32*L[1],-4, 27*L[1],30);
+    ctx.bezierCurveTo(23*L[1],50, 5*L[1],54, -5*L[1],44);
+    ctx.bezierCurveTo(-15*L[1],34, -17*L[1],4, -12*L[1],-20);
+    ctx.bezierCurveTo(-10*L[1],-34, -6*L[1],-45, 0,-46);
     ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#E88B8B"; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.strokeStyle = C.lungHi; ctx.lineWidth = 2; ctx.globalAlpha = 0.7;
+    for (let i=0;i<3;i++){                               // airway branches inside
+      ctx.beginPath(); ctx.moveTo(-6*L[1], -16+i*14);
+      ctx.quadraticCurveTo(8*L[1], -12+i*14, 17*L[1], -4+i*15); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
     ctx.restore();
   });
-  ctx.strokeStyle = C.lungHi; ctx.lineWidth = 11;
-  ctx.beginPath(); ctx.moveTo(180,188); ctx.lineTo(180,228); ctx.stroke();
+  ctx.strokeStyle = C.lungHi; ctx.lineWidth = 11;        // trachea
+  ctx.beginPath(); ctx.moveTo(172,176); ctx.lineTo(170,212); ctx.stroke();
   ctx.lineWidth = 7;
-  ctx.beginPath(); ctx.moveTo(180,226); ctx.quadraticCurveTo(166,236,160,248); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(180,226); ctx.quadraticCurveTo(196,236,202,248); ctx.stroke();
-  ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.5;
-  for (let i=0;i<3;i++){ const y=196+i*10; ctx.beginPath(); ctx.moveTo(174,y); ctx.lineTo(186,y); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(170,210); ctx.quadraticCurveTo(156,222,150,236); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(170,210); ctx.quadraticCurveTo(188,222,196,234); ctx.stroke();
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.2;
+  for (let i=0;i<4;i++){ const y=182+i*8; ctx.beginPath(); ctx.moveTo(166,y); ctx.lineTo(178,y); ctx.stroke(); }
 
   /* --- heart --- */
   ctx.save();
-  ctx.translate(170, 252); ctx.scale(1+0.17*hb, 1+0.12*hb);
+  ctx.translate(177, 256); ctx.scale(1+0.17*hb, 1+0.12*hb);
   ctx.globalCompositeOperation = "lighter";
   ctx.globalAlpha = 0.18+0.32*hb;
-  ctx.drawImage(GLOW.pink, -34,-34, 68,68);
+  ctx.drawImage(GLOW.pink, -36,-36, 72,72);
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
   ctx.fillStyle = C.heart; ctx.beginPath();
-  ctx.moveTo(0,16);
-  ctx.bezierCurveTo(-20,2, -20,-14, -9,-14);
-  ctx.bezierCurveTo(-3,-14, 0,-9, 0,-6);
-  ctx.bezierCurveTo( 0,-9,  3,-14,  9,-14);
-  ctx.bezierCurveTo(20,-14, 20,2, 0,16);
+  ctx.moveTo(0,19);
+  ctx.bezierCurveTo(-24,3, -24,-17, -11,-17);
+  ctx.bezierCurveTo(-4,-17, 0,-11, 0,-7);
+  ctx.bezierCurveTo( 0,-11, 4,-17, 11,-17);
+  ctx.bezierCurveTo(24,-17, 24,3, 0,19);
   ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "#E04E63"; ctx.lineWidth = 1.5; ctx.stroke();
   ctx.fillStyle = C.heartHi; ctx.globalAlpha = 0.6;
-  ctx.beginPath(); ctx.ellipse(-6,-6,3.5,5,-0.4,0,6.2832); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-7,-7,4,5.5,-0.4,0,6.2832); ctx.fill();
   ctx.globalAlpha = 1;
   ctx.restore();
 
@@ -741,32 +994,27 @@ function draw(dt){
     ctx.globalAlpha = 1;
     ctx.restore();
   }
-  ctx.strokeStyle = C.stomHi; ctx.lineWidth = 2; ctx.stroke(STOM);
+  ctx.strokeStyle = C.stomSh; ctx.lineWidth = 2; ctx.stroke(STOM);
   ctx.restore();
 
-  /* --- intestine --- */
-  ctx.save();
-  if (organGlow.tummy > 0.01){
-    ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = organGlow.tummy*0.45;
-    ctx.drawImage(GLOW.green, TARGET.tummy.x-66, TARGET.tummy.y-56, 132, 112);
-    ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
-  }
-  blit(ctx, bakedGut, 0, 0);
-  ctx.restore();
+  /* --- the cage again, faintly, over the organs: without this second pass the
+         ribs vanish behind the lungs and the body stops reading as a skeleton --- */
+  ctx.globalAlpha = 0.34; blit(ctx, bakedSkel, 0, 0); ctx.globalAlpha = 1;
 
-  /* --- throat bulge, drawn under the skin so it reads as "inside" --- */
-  if (bulgeT >= 0){
-    const u = clamp01(bulgeT/0.6);
-    const bx = lerp(180,172,u), byy = lerp(150,282,u);
-    ctx.fillStyle = "#F0C49A";
-    ctx.beginPath(); ctx.ellipse(bx, byy, 9, 10, 0,0,6.2832); ctx.fill();
+  /* --- a highlight ring when an organ has just been tapped --- */
+  if (spotRing && spotRingT > 0){
+    const u = 1 - spotRingT/1.6;
+    ctx.strokeStyle = "rgba(91,192,190," + (0.85*(1-u)).toFixed(3) + ")";
+    ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.ellipse(spotRing.x, spotRing.y, spotRing.r*(1+u*0.25), spotRing.r*(1+u*0.25), 0,0,6.2832);
+    ctx.stroke();
   }
 
   /* --- translucent skin over the torso: a transparency overlay, never a
          dissection. No cut edges, no peeled flaps — that is what keeps it
          friendly instead of gory. --- */
   ctx.save();
-  ctx.translate(CX, 334); ctx.scale(1+0.025*b, 1+0.045*b); ctx.translate(-CX, -334);
+  ctx.translate(CX, 340); ctx.scale(1+0.025*b, 1+0.045*b); ctx.translate(-CX, -340);
   ctx.fillStyle = C.skin; ctx.fill(torsoPath);
   ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5; ctx.stroke(torsoPath);
   ctx.restore();
@@ -774,14 +1022,14 @@ function draw(dt){
   /* --- head --- */
   const sq = squashT >= 0 ? squashCurve(clamp01(squashT/0.45)) : { sx:1, sy:1 };
   ctx.save();
-  ctx.translate(180, 164); ctx.scale(sq.sx, sq.sy); ctx.translate(-180, -164);
+  ctx.translate(180, 150); ctx.scale(sq.sx, sq.sy); ctx.translate(-180, -150);
   ctx.fillStyle = C.skinSolid;
-  rr(ctx, 163, 148, 34, 38, 12); ctx.fill();
+  rr(ctx, 162, 138, 36, 40, 13); ctx.fill();
 
   if (organGlow.brain > 0.01 || organGlow.eyes > 0.01){
     ctx.globalCompositeOperation = "lighter";
     ctx.globalAlpha = Math.max(organGlow.brain, organGlow.eyes)*0.45;
-    ctx.drawImage(GLOW.pink, 110, 36, 140, 140);
+    ctx.drawImage(GLOW.pink, 110, 20, 140, 140);
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
   }
   blit(ctx, bakedBrain, 0, 0);
@@ -790,54 +1038,63 @@ function draw(dt){
     for (let i=0;i<4;i++){
       const ph = (T*1.1 + i*0.25) % 1;
       ctx.globalAlpha = Math.sin(ph*Math.PI)*organGlow.brain*0.9;
-      ctx.drawImage(GLOW.gold, 152+i*20 - 7, 74 + Math.sin(ph*6.28+i)*6 - 7, 14, 14);
+      ctx.drawImage(GLOW.gold, 152+i*20 - 7, 68 + Math.sin(ph*6.28+i)*6 - 7, 14, 14);
     }
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
   }
 
   ctx.fillStyle = C.skin;
-  ctx.beginPath(); ctx.ellipse(180, 100, 58, 64, 0, 0, 6.2832); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(180, 90, 55, 60, 0, 0, 6.2832); ctx.fill();
   ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5; ctx.stroke();
 
-  ctx.save();
-  ctx.beginPath(); ctx.ellipse(180, 100, 58, 64, 0, 0, 6.2832); ctx.clip();
+  ctx.save();                                            // hair, clipped to the head
+  ctx.beginPath(); ctx.ellipse(180, 90, 55, 60, 0, 0, 6.2832); ctx.clip();
   ctx.fillStyle = C.hair;
   ctx.beginPath();
-  ctx.moveTo(114, 104);
-  ctx.lineTo(114, 24); ctx.lineTo(246, 24); ctx.lineTo(246, 104);
-  ctx.bezierCurveTo(238, 78, 228, 64, 218, 59);
-  ctx.bezierCurveTo(208, 72, 195, 77, 180, 77);
-  ctx.bezierCurveTo(163, 77, 149, 71, 142, 59);
-  ctx.bezierCurveTo(130, 66, 120, 80, 114, 104);
+  ctx.moveTo(118, 116);
+  ctx.lineTo(118, 18); ctx.lineTo(242, 18); ctx.lineTo(242, 116);
+  ctx.bezierCurveTo(238, 86, 228, 62, 212, 54);
+  ctx.bezierCurveTo(200, 48, 160, 48, 148, 54);
+  ctx.bezierCurveTo(132, 62, 122, 86, 118, 116);
   ctx.closePath(); ctx.fill();
-  ctx.fillStyle = C.hairHi; ctx.globalAlpha = 0.45;
-  ctx.beginPath(); ctx.ellipse(150, 52, 17, 7, -0.45, 0, 6.2832); ctx.fill();
+  ctx.fillStyle = C.hairHi; ctx.globalAlpha = 0.42;
+  ctx.beginPath(); ctx.ellipse(150, 44, 17, 7, -0.45, 0, 6.2832); ctx.fill();
   ctx.globalAlpha = 1;
   ctx.restore();
 
   const eo = eyeOpen();
   const browLift = Math.max(organGlow.brain, organGlow.eyes)*4;
   ctx.fillStyle = "#3D405B";
-  [[157,1],[203,-1]].forEach(function(E){
+  [[158,1],[202,-1]].forEach(function(E){
     if (eo < 0.12){
       ctx.strokeStyle = "#3D405B"; ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.arc(E[0], 120, 9, 0.15, Math.PI-0.15); ctx.stroke();
+      ctx.beginPath(); ctx.arc(E[0], 116, 9, 0.15, Math.PI-0.15); ctx.stroke();
     } else {
-      ctx.beginPath(); ctx.ellipse(E[0], 120, 9.5, 11.5*eo, 0, 0, 6.2832); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(E[0], 116, 9.5, 11.5*eo, 0, 0, 6.2832); ctx.fill();
       ctx.fillStyle = "#fff";
-      ctx.beginPath(); ctx.ellipse(E[0]+3, 116, 3, 3.4*eo, 0, 0, 6.2832); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(E[0]+3, 112, 3, 3.4*eo, 0, 0, 6.2832); ctx.fill();
       ctx.fillStyle = "#3D405B";
     }
     ctx.strokeStyle = C.hair; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(E[0], 110-browLift, 11, Math.PI+0.3, -0.3); ctx.stroke();
+    ctx.beginPath(); ctx.arc(E[0], 106-browLift, 11, Math.PI+0.3, -0.3); ctx.stroke();
   });
-  ctx.strokeStyle = "#C9636F"; ctx.lineWidth = 3;
-  ctx.beginPath();
-  const smile = 6 + organGlow.build*3 + organGlow.eyes*3;
-  ctx.moveTo(168, 140); ctx.quadraticCurveTo(180, 140+smile, 192, 140); ctx.stroke();
+
+  /* mouth — opens while chewing, and you can see the teeth doing the work */
+  const chewing = squashT >= 0;
+  if (chewing){
+    const open = Math.sin(clamp01(squashT/0.45)*Math.PI)*7;
+    ctx.fillStyle = "#B35A66";
+    ctx.beginPath(); ctx.ellipse(180, 136, 15, 5+open, 0, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = "#FFF8EC";
+    for (let i=0;i<5;i++) rr(ctx, 167+i*6, 130, 5, 4.5, 1.6), ctx.fill();
+  } else {
+    ctx.strokeStyle = "#C9636F"; ctx.lineWidth = 3;
+    const smile = 6 + organGlow.build*3 + organGlow.eyes*3;
+    ctx.beginPath(); ctx.moveTo(168, 134); ctx.quadraticCurveTo(180, 134+smile, 192, 134); ctx.stroke();
+  }
   ctx.fillStyle = "rgba(255,150,160,0.35)";
-  ctx.beginPath(); ctx.ellipse(146,132,9,6,0,0,6.2832); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(214,132,9,6,0,0,6.2832); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(144,128,9,6,0,0,6.2832); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(216,128,9,6,0,0,6.2832); ctx.fill();
   ctx.restore();
 
   ctx.restore();  // body transform
@@ -848,7 +1105,7 @@ function draw(dt){
     ctx.save();
     const u = clamp01(flying.t/0.5);
     const e = easeOutBack(u);
-    const x = lerp(flying.x0, 180, e), y = lerp(flying.y0, 146, e);
+    const x = lerp(flying.x0, 180, e), y = lerp(flying.y0, 140, e);
     ctx.globalAlpha = u > 0.88 ? (1-u)/0.12 : 1;
     ctx.font = "34px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.translate(x,y); ctx.rotate(Math.sin(u*7)*0.3*(1-u)); ctx.scale(1-u*0.25, 1-u*0.25);
@@ -856,6 +1113,23 @@ function draw(dt){
     ctx.restore();
   }
   ctx.restore();
+}
+
+/* tap anywhere on the body to meet that organ */
+function onCanvasTap(ev){
+  if (!started || busy) return;
+  const r = cv.getBoundingClientRect();
+  const x = (ev.clientX - r.left - offX)/fit;
+  const y = (ev.clientY - r.top  - offY)/fit - bob(T);
+  for (const sp of SPOTS){
+    if (Math.hypot(x-sp.x, y-sp.y) <= sp.r){
+      spotRing = sp; spotRingT = 1.6;
+      caption("<b>"+sp.n+"</b> — "+sp.s.split("— ")[1], 4.0);
+      speak(sp.s.replace(" — ", ". "));
+      sfx("click");
+      return;
+    }
+  }
 }
 
 /* ============================ voice ============================
@@ -1303,17 +1577,38 @@ function grownUps(){
 }
 
 let started = false;
+
+/* The rules, on the page, before anything else — and reachable any time from
+   the ? button. Short lines, big pictures, no reading required to play. */
+function howToPlay(fromGame){
+  show(
+    "<h1>How to play</h1>"+
+    '<div class="rules">'+
+      '<div class="rule"><span class="rn">🍽️</span><span class="rt"><b>Tap any food.</b> It gets chewed, swallowed, and you watch it travel all the way down.</span></div>'+
+      '<div class="rule"><span class="rn">✨</span><span class="rt"><b>Watch where it goes.</b> The goodness flies off as glowing specks to the parts that use it — bones, muscles, eyes, brain, tummy.</span></div>'+
+      '<div class="rule"><span class="rn">🍱</span><span class="rt"><b>Fill your plate — 5 foods.</b> The last ⭐ slot is a free slot. Put anything you like in it.</span></div>'+
+      '<div class="rule"><span class="rn">🌈</span><span class="rt"><b>Try to find all five groups:</b><br>🥬 Veg · 🍎 Fruit · 🌾 Grain · 🫘 Protein · 🥛 Dairy<br>All five on one plate = ⭐⭐⭐</span></div>'+
+      '<div class="rule"><span class="rn">☀️</span><span class="rt"><b>3 plates make a day.</b> Then you see everything your body collected.</span></div>'+
+      '<div class="rule"><span class="rn">👆</span><span class="rt"><b>Poke the body!</b> Tap the heart, lungs, stomach or any part and it will tell you what it does.</span></div>'+
+    "</div>"+
+    "<p class=\"noLose\">There is no losing here, and nothing you pick is ever wrong. 💛</p>"+
+    '<button class="go" id="rulesGo">'+(fromGame ? "Back to playing ▶" : "Let's play ▶")+"</button>"
+  );
+  document.getElementById("rulesGo").addEventListener("click", function(){
+    if (fromGame) { hide(); return; }
+    if (!askedAboutIntention()) startGame();
+  });
+}
+
 function titleScreen(){
   show(
     '<div class="big">🫀</div>'+
     "<h1>Inside Me</h1>"+
     "<p>Feed this body and watch what happens <b>inside</b> — where every bite goes, "+
     "and what your body builds with it.</p>"+
-    '<button class="go" id="play">Play ▶</button>'
+    '<button class="go" id="play">How to play ▶</button>'
   );
-  document.getElementById("play").addEventListener("click", function(){
-    if (!askedAboutIntention()) startGame();
-  });
+  document.getElementById("play").addEventListener("click", function(){ howToPlay(false); });
 }
 
 function startGame(){
@@ -1355,6 +1650,8 @@ function init(){
   dealTray();
   titleScreen();
   document.getElementById("grownBtn").addEventListener("click", grownUps);
+  document.getElementById("rulesBtn").addEventListener("click", function(){ howToPlay(true); });
+  cv.addEventListener("pointerdown", onCanvasTap);
   window.addEventListener("resize", resize);
   window.addEventListener("orientationchange", function(){ setTimeout(resize, 120); });
   document.addEventListener("visibilitychange", function(){ lastTs = performance.now(); });

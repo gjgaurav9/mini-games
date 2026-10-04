@@ -70,8 +70,19 @@ penalties, effort rewards).
 
 `inside-me` (Inside Me — feed an animated see-through body and watch the food travel
 down and the nutrients fly to the organs that use them; ages ~5–10). Canvas 2D, one
-design space of 360×620 letterboxed to any phone, with a cached skeleton / intestine
-coil / brain-fold bake, asymmetric breathing, a true lub-dub heart curve, and pre-baked
+design space of 360×640 letterboxed to any phone. The anatomy is deliberately full:
+brain + cerebellum, teeth, trachea with rings, lungs with airway branches, heart,
+diaphragm, food pipe (the bolus visibly travels it), liver, gall bladder, spleen,
+pancreas, stomach, small + large intestine, kidneys, ureters, bladder, aorta and vena
+cava, ribcage, sternum, clavicles, spine, pelvis, and limb bones + muscle fibres.
+Baked once per resize into five offscreen canvases (`bakedSkel`, `bakedVess`,
+`bakedVisc`, `bakedBrain`, `bakedLimbBone`); only lungs, heart, stomach, diaphragm and
+the bolus animate per frame. **The skeleton is blitted twice — solid behind the organs
+and again at alpha 0.34 in front — otherwise the ribs vanish behind the lungs.**
+Tapping any organ names it and says what it does (`SPOTS`, circle hit-tests in design
+space, front-most first). There is a **How to play** screen before the first plate,
+reachable any time from the `?` button; the `i` button is the grown-ups card.
+Asymmetric breathing, a true lub-dub heart curve, and pre-baked
 radial glow sprites for the nutrient particles. **`ctx.filter='blur()'` is unusable on
 iOS Safari and `shadowBlur` is the big mobile FPS killer — do not reintroduce either;
 glows are radial-gradient sprites drawn with `'lighter'`, plus multi-pass strokes.**
